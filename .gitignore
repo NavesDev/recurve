@@ -1,0 +1,6 @@
+# Development
+.idea
+.dev
+
+# Generated local files
+*.class

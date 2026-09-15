@@ -1,0 +1,15 @@
+services:
+  postgres:
+    image: postgres:18
+    container_name: recurve-database
+    environment:
+      POSTGRES_DB: recurve-database
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+    ports:
+      - "54330:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql
+
+volumes:
+  postgres_data:

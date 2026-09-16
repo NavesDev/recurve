@@ -154,10 +154,11 @@ página é irrelevante).
 | `plan_prices` | `(plan_id, interval, currency) WHERE active` | unique parcial | RN-03; filtro por ciclo (RF-06.2) |
 | `subscribers` | `email` | unique | RN-02 |
 | `subscribers` | `plan_price_id` | btree | FK; filtro por plano (RF-06.3); contagem de assinaturas (RF-06.2) |
-| `subscribers` | `(status, next_billing_at)` | btree | job de cobrança `WHERE status <> 'CANCELED' AND next_billing_at <= now()` (RF-04.1); filtro por status (RF-06.3) |
+| `subscribers` | `status` | btree | filtro por status (RF-06.3) |
+| `subscribers` | `next_billing_at` | btree | job de cobrança `WHERE next_billing_at <= now()` (RF-04.1) |
 | `subscribers` | `started_at` | btree | ordenação padrão (RF-06.3) |
 | `payments` | `subscriber_id` | btree | FK; listar por assinante (RF-04.6) |
-| `payments` | `(status, due_at)` | btree | listar por status (RF-04.6); pendentes vencidos |
+| `payments` | `status` | btree | listar por status (RF-04.6) |
 | `payments` | `external_id` | btree | webhook e conciliação (RF-04.7) |
 
 Não indexado, de propósito:

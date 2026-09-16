@@ -68,7 +68,8 @@ existentes continuam no antigo.
 | active | boolean | `active` | not null |
 | createdAt | Instant | `created_at` | not null |
 
-Índice único parcial: `(plan_id, interval, currency) WHERE active`.
+Índice único parcial: `(plan_id, interval, currency) WHERE active`
+(ver Índices).
 
 ### BillingInterval (enum, `plan`)
 
@@ -90,7 +91,6 @@ Assinante de um preço de plano.
 | canceledAt | Instant | `canceled_at` | nullable |
 | createdAt | Instant | `created_at` | not null |
 
-Índice: `next_billing_at` (job de cobrança faz `WHERE next_billing_at <= now()`).
 
 ### SubscriberStatus (enum, `subscriber`)
 
@@ -118,7 +118,6 @@ alterar histórico.
 | externalId | String | `external_id` | nullable. Id da transação no gateway de pagamento; usado em webhook, estorno e conciliação. Vazio em pagamento manual |
 | createdAt | Instant | `created_at` | not null |
 
-Índices: `subscriber_id`, `external_id`.
 
 ### PaymentStatus (enum, `payment`)
 
@@ -137,6 +136,38 @@ alterar histórico.
   (`@ManyToOne`). Evita lazy loading vazando pro domínio e mantém feature
   desacoplada.
 - Enum persiste como `@Enumerated(EnumType.STRING)`.
-- FK e índices ficam no schema. Enquanto `ddl-auto: update` estiver ativo,
-  Hibernate gera colunas mas não índice parcial; migrar pra Flyway quando o
-  schema estabilizar.
+- FK e índices ficam no schema (ver Índices).
+
+## Índices
+
+Regra: indexa filtro de igualdade/range, ordenação padrão, FK e unicidade.
+Não indexa busca `ILIKE '%q%'` (B-tree não serve; `pg_trgm` só se volume
+justificar) nem ordenação de campo já filtrado (sort em memória de uma
+página é irrelevante).
+
+| Tabela | Índice | Tipo | Serve |
+|---|---|---|---|
+| `users` | `email` | unique | login, RN-02 |
+| `user_permissions` | `(user_id, permission)` | PK | carregar permissões do operador |
+| `plans` | `active` | btree | RF-02.4, listar só ativos |
+| `plan_prices` | `plan_id` | btree | FK; listar preços do plano |
+| `plan_prices` | `(plan_id, interval, currency) WHERE active` | unique parcial | RN-03; filtro por ciclo (RF-06.2) |
+| `subscribers` | `email` | unique | RN-02 |
+| `subscribers` | `plan_price_id` | btree | FK; filtro por plano (RF-06.3); contagem de assinaturas (RF-06.2) |
+| `subscribers` | `(status, next_billing_at)` | btree | job de cobrança `WHERE status <> 'CANCELED' AND next_billing_at <= now()` (RF-04.1); filtro por status (RF-06.3) |
+| `subscribers` | `started_at` | btree | ordenação padrão (RF-06.3) |
+| `payments` | `subscriber_id` | btree | FK; listar por assinante (RF-04.6) |
+| `payments` | `(status, due_at)` | btree | listar por status (RF-04.6); pendentes vencidos |
+| `payments` | `external_id` | btree | webhook e conciliação (RF-04.7) |
+
+Não indexado, de propósito:
+
+- `users.name`, `users.email`, `subscribers.name`, `subscribers.email`,
+  `plans.name` para busca `q`. Seq scan até volume justificar `pg_trgm`.
+- Ordenação por valor cobrado do assinante (RF-06.3): join em
+  `plan_prices` pela PK, sort do resultado filtrado.
+- `users.active`: tabela pequena, baixa cardinalidade.
+
+Declaração: `@Index` em `@Table` na entity enquanto `ddl-auto: update`.
+Índice parcial Hibernate não gera; entra via Flyway (RNF-08). Quando
+Flyway existir, migration é a fonte da verdade e `@Index` sai.

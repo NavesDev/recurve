@@ -69,7 +69,7 @@ ainda não foram definidos.
 Aplica-se às listagens. Busca é texto livre, case-insensitive, por trecho
 (`%q%`). Filtros combinam com AND; valores múltiplos do mesmo filtro com
 OR. Ordenação aceita um campo e direção (`asc`/`desc`); campo fora da
-lista permitida é erro de validação. Toda listagem é paginada.
+lista permitida é erro de validação. Toda listagem é paginada (RF-07).
 
 #### RF-06.1 Operadores
 
@@ -96,6 +96,21 @@ lista permitida é erro de validação. Toda listagem é paginada.
 - Ordenação por valor cobrado: valor do preço ao qual o assinante está
   vinculado.
 - Ordenação padrão: `startedAt` desc.
+
+### RF-07 Paginação
+
+Aplica-se a toda listagem (operadores, planos, assinantes, pagamentos).
+Paginação por offset.
+
+- RF-07.1 Parâmetros `page` (base 0, padrão 0) e `size` (padrão 20,
+  máximo 100). Valor fora da faixa é erro de validação.
+- RF-07.2 Resposta contém os itens da página, `page`, `size` e `total`
+  (contagem após busca e filtro, antes de paginar).
+- RF-07.3 Página além do fim retorna lista vazia com `total` correto; não
+  é erro.
+- RF-07.4 Ordenação estável: quando o campo de ordenação tem empate,
+  desempata por `id`. Garante que item não repete nem some entre páginas.
+- RF-07.5 Busca, filtro e ordenação (RF-06) aplicam antes da paginação.
 
 ## Regras de negócio
 

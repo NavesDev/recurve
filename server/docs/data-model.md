@@ -24,7 +24,7 @@ cargo.
 | active | boolean | `active` | not null, default true |
 | createdAt | Instant | `created_at` | not null |
 
-### Permission (enum, `user/domain`)
+### Permission (enum, `user`)
 
 Uma permissão de leitura e uma de escrita por recurso. `MANAGE_*` implica o
 `VIEW_*` correspondente; checagem de leitura aceita qualquer um dos dois.
@@ -54,7 +54,7 @@ O produto. Não tem preço nem intervalo próprios; isso fica em `PlanPrice`.
 
 ## PlanPrice
 
-Quanto e com que frequência. Mesmo agregado de `Plan`, vive em `plan/domain`.
+Quanto e com que frequência. Mesmo agregado de `Plan`, vive em `plan`.
 Mudar preço = criar novo `PlanPrice` e desativar o antigo; assinantes
 existentes continuam no antigo.
 
@@ -70,7 +70,7 @@ existentes continuam no antigo.
 
 Índice único parcial: `(plan_id, interval, currency) WHERE active`.
 
-### BillingInterval (enum, `plan/domain`)
+### BillingInterval (enum, `plan`)
 
 `MONTHLY`, `YEARLY`
 
@@ -92,7 +92,7 @@ Assinante de um preço de plano.
 
 Índice: `next_billing_at` (job de cobrança faz `WHERE next_billing_at <= now()`).
 
-### SubscriberStatus (enum, `subscriber/domain`)
+### SubscriberStatus (enum, `subscriber`)
 
 | Valor | Significado |
 |---|---|
@@ -120,7 +120,7 @@ alterar histórico.
 
 Índices: `subscriber_id`, `external_id`.
 
-### PaymentStatus (enum, `payment/domain`)
+### PaymentStatus (enum, `payment`)
 
 | Valor | Significado |
 |---|---|
@@ -131,8 +131,8 @@ alterar histórico.
 
 ## Convenções de mapeamento
 
-- Domain model é `record` imutável. Entity JPA é classe mutável separada em
-  `infrastructure/persistence`; conversão dentro do `RepositoryImpl`.
+- Entity JPA é o modelo de domínio. Mutação só por método de negócio, sem
+  setter público (ver `architecture.md`).
 - Relação entre agregados é por id (`planPriceId: UUID`), não por objeto
   (`@ManyToOne`). Evita lazy loading vazando pro domínio e mantém feature
   desacoplada.

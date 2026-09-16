@@ -1,179 +1,312 @@
 # Arquitetura
 
-Recurve segue **Clean Architecture** com organização **package by feature**. Cada
-feature é uma fatia vertical autocontida com suas próprias camadas. Código
-transversal vive em `shared/`.
+Recurve usa **arquitetura em camadas, organizada por feature**. Cada feature
+é um pacote autocontido com quatro camadas: apresentação, aplicação,
+domínio e persistência.
+
+Princípios:
+
+- Entity JPA é o modelo de domínio. Regras de negócio vivem em métodos da
+  entity, não na service.
+- Service é a única porta de entrada da feature. Controller, scheduler e
+  outras features só falam com a service.
+- Interface só onde troca de implementação é plausível: serviço externo
+  (gateway de pagamento, email). Repositório é Spring Data direto.
+- Autorização por `@PreAuthorize` na service.
+
+## Camadas
+
+```
+┌────────────────────────────────────────────────────────────┐
+│  APRESENTAÇÃO                                    web/      │
+│  Recebe entrada externa, valida forma, converte pra        │
+│  comando. Converte resultado em saída externa.             │
+└──────────────────────────┬─────────────────────────────────┘
+                           ▼
+┌────────────────────────────────────────────────────────────┐
+│  APLICAÇÃO                                       service/  │
+│  Um método por caso de uso. Transação e autorização.       │
+│  Busca, chama o domínio, persiste. Coordena; não contém    │
+│  regra de negócio.                                         │
+└──────────────┬────────────────────────────────┬────────────┘
+               ▼                                ▼
+┌────────────────────────────┐   ┌──────────────────────────────┐
+│  DOMÍNIO           domain/ │◄──│  PERSISTÊNCIA    repository/ │
+│  Modelo + regras. Estado   │   │  Grava e busca o modelo.     │
+│  só muda por método de     │   │  Traduz filtro em query.     │
+│  negócio. Não depende de   │   │  Não conhece regra.          │
+│  nada.                     │   │                              │
+└────────────────────────────┘   └──────────────────────────────┘
+```
+
+Setas só apontam pra baixo.
+
+| Camada | Entrada | Saída | Pode importar | Proibido |
+|---|---|---|---|---|
+| Apresentação | protocolo externo (HTTP, JSON) | protocolo externo | Aplicação, Domínio | Persistência |
+| Aplicação | comando, id, filtro | modelo de domínio | Domínio, Persistência, Aplicação de outra feature | Apresentação |
+| Domínio | valores primitivos, outro modelo | modelo, exception de negócio | nada da feature | qualquer camada |
+| Persistência | modelo, `Specification`, `Pageable` | modelo | Domínio | Aplicação, Apresentação |
 
 ## Layout
 
 ```
 src/main/java/com/navesdev/recurve/
 ├── RecurveApplication.java
-├── shared/
-│   ├── domain/           # DomainException, value objects, utilitários puros
-│   ├── application/      # ApplicationException
-│   ├── infrastructure/   # InfrastructureException, entity base, config
-│   └── web/              # exception handler global, formato de erro, config HTTP
 ├── user/
 ├── plan/
+├── payment/
+│   └── gateway/          # interface de serviço externo + impl
 └── subscriber/
-    ├── domain/           # modelo, regras e exceptions de negócio
-    ├── application/      # casos de uso e comandos
-    │   └── port/         # interfaces de saída (repositório, gateway)
-    └── infrastructure/
-        ├── persistence/  # entidades JPA, Spring Data, implementação dos ports
-        └── web/          # controllers, request/response DTOs
+    ├── domain/           # @Entity com regras, enums
+    │   └── exception/    # exceptions de negócio da feature
+    ├── repository/       # Spring Data, Specifications
+    ├── service/          # Service, Commands, Filters
+    └── web/              # Controller, Request, Response
 ```
 
-## Camadas
+Toda feature segue as quatro subpastas. Subpasta extra só para adapter de
+serviço externo (`payment/gateway/`).
 
-### `domain`
+Código transversal (config de segurança, handler global de exception,
+paginação) **[aberto]**: local a definir quando a primeira feature existir.
 
-Núcleo. Java puro, sem import de Spring, JPA ou qualquer framework.
+## Detalhe de cada camada
 
-- Modelos de negócio (`record` ou POJO): `User`, `Plan`, `Subscriber`
-- Value objects: `Email`, `Money`
-- Exceptions de negócio: `UserNotFoundException`, `EmailAlreadyInUseException`
-- Constantes de regra de negócio, como `static final` na classe que usa
+### Domínio (`domain/`)
 
-Não depende de nada. Nem de `application`, nem de `infrastructure`.
+`@Entity` mutável, mas mutação só por método de negócio. Sem setter público.
 
-### `application`
+- Construtor ou factory estática valida invariantes: `User.create(name, email, passwordHash, now)`.
+- Transição de estado é método com nome de negócio: `subscriber.cancel(now)`,
+  `subscriber.confirmPayment(interval)`, `plan.deactivate()`.
+- Método lança exception de negócio quando regra é violada:
+  `payment.refund()` em status diferente de `PAID` lança
+  `PaymentNotRefundableException`.
+- Regra que precisa de dado externo (email único) fica na service, porque
+  entity não consulta banco.
+- Tempo entra por parâmetro (`Instant now`). Entity nunca chama
+  `Instant.now()`.
 
-Orquestra o domínio. Contém os casos de uso e o que eles precisam do mundo
-externo, declarado como interface.
+JPA no domínio: **só anotação de mapeamento** (`@Entity`, `@Table`,
+`@Column`, `@Id`, `@Enumerated`). Nada de `EntityManager`, `@Query`,
+`@Transactional`. Domínio sabe que é persistido; não sabe como.
 
-- Casos de uso: `CreateUserUseCase`, `FindPlanUseCase`. Uma classe por ação,
-  método `execute`. Anotados com `@Service` e `@Transactional`.
-- Comandos de entrada: `CreateUserCommand`. Record simples, sem validação
-  de framework.
-- `port/`: interfaces de saída. `UserRepository`, `PaymentGateway`. Definem
-  **o que** o caso de uso precisa, não **como** é feito.
+```java
+@Entity
+@Table(name = "subscribers")
+public class Subscriber {
 
-Depende só de `domain`.
+    // ... campos, construtor protegido para JPA
 
-### `infrastructure`
+    public static Subscriber start(String name, String email, PlanPrice price, Instant now) {
+        var s = new Subscriber();
+        s.id = UUID.randomUUID();
+        s.planPriceId = price.getId();
+        s.name = name;
+        s.email = email;
+        s.status = SubscriberStatus.ACTIVE;
+        s.startedAt = now;
+        s.nextBillingAt = price.getInterval().advance(now);
+        s.createdAt = now;
+        return s;
+    }
 
-Adapters. Tudo que fala com framework ou serviço externo.
+    public void cancel(Instant now) {
+        if (status == SubscriberStatus.CANCELED) {
+            throw new SubscriberAlreadyCanceledException(id);
+        }
+        status = SubscriberStatus.CANCELED;
+        canceledAt = now;
+    }
 
-- `persistence/`: `@Entity` JPA, `JpaRepository` do Spring Data, e a classe
-  `<X>RepositoryImpl` que implementa o port de `application/port/`. Mapeamento
-  domain ↔ entity fica aqui.
-- `web/`: `@RestController`, `<X>Request` (com Bean Validation), `<X>Response`.
-  Controller converte HTTP em comando, chama o caso de uso, converte o
-  resultado em response. Sem regra de negócio.
-- Outros adapters de saída (gateway de pagamento, email, fila) também
-  entram aqui, implementando o port correspondente.
+    public void confirmPayment(BillingInterval interval) {
+        status = SubscriberStatus.ACTIVE;
+        nextBillingAt = interval.advance(nextBillingAt);
+    }
+}
+```
 
-Depende de `application` e `domain`.
+### Persistência (`repository/`)
+
+Interface Spring Data. `JpaSpecificationExecutor` quando a listagem tem
+filtro dinâmico. Query customizada com `@Query` ou `Specification` em
+classe própria (`SubscriberSpecifications`). Nunca lógica de negócio;
+nunca chama método de negócio da entity.
+
+### Aplicação (`service/`)
+
+`@Service`, `@Transactional`. Um método por caso de uso.
+
+Padrão de três passos para todo caso de uso que muda estado:
+
+```
+1. repository.findById(id)      carrega  (pula na criação)
+2. entity.metodoDeNegocio()     domínio muda estado, ou lança
+3. repository.save(entity)      persiste
+```
+
+`save()` sempre explícito, mesmo em alteração. Para entity gerenciada é
+no-op, mas deixa a intenção visível sem depender de dirty checking. Se o
+passo 2 lançar, passo 3 não roda e a transação faz rollback.
+
+Antes do passo 2 a service também:
+
+- Checa autorização (`@PreAuthorize`).
+- Valida regra que depende do banco ou de outra entity (unicidade de
+  email, preço ativo).
+- Busca em outra feature o que a regra do domínio precisa
+  (`planService.findActivePrice`).
+
+Não faz: validação de formato (Bean Validation no request), serialização
+HTTP, `if` de regra que cabe na entity.
+
+```java
+@Service
+@Transactional
+public class SubscriberService {
+
+    @PreAuthorize("hasAuthority('MANAGE_SUBSCRIBERS')")
+    public Subscriber create(CreateSubscriberCommand cmd) {
+        if (repository.existsByEmail(cmd.email())) {
+            throw new EmailAlreadyInUseException(cmd.email());
+        }
+        PlanPrice price = planService.findActivePrice(cmd.planPriceId());
+        Subscriber subscriber = Subscriber.start(cmd.name(), cmd.email(), price, clock.instant());
+        return repository.save(subscriber);
+    }
+
+    @PreAuthorize("hasAuthority('MANAGE_SUBSCRIBERS')")
+    public Subscriber cancel(UUID id) {
+        Subscriber subscriber = findOrThrow(id);   // 1
+        subscriber.cancel(clock.instant());        // 2
+        return repository.save(subscriber);        // 3
+    }
+}
+```
+
+Entrada da service é `record` de comando (`CreateSubscriberCommand`), ids
+ou `record` de filtro. Request web nunca chega na service. Saída é a
+entity (ou `Page<Entity>`).
+
+### Apresentação (`web/`)
+
+`@RestController`. Converte HTTP em chamada de service e resultado em
+response. Sem regra, sem `@PreAuthorize` (já está na service).
+
+- Request: `record` com Bean Validation, método `toCommand()`.
+- Response: `record` com factory `from(entity)`. Web lê getters da
+  entity, nunca chama método de negócio.
+- Listagem: query params viram `record` de filtro + `Pageable`; resposta
+  em `PageResponse<T>`.
+
+## Autorização
+
+Spring Security com method security habilitada
+(`@EnableMethodSecurity`).
+
+- `Permission` do `User` vira `GrantedAuthority` no login.
+- `MANAGE_*` implica `VIEW_*`: resolvido ao montar as authorities do
+  principal, não na anotação. `@PreAuthorize` sempre cita **uma** permissão.
+- Anotação na service, nunca no controller. Assim scheduler e chamada entre
+  features também passam pela checagem.
+- Método interno que não deve ser checado (chamado só por outra service da
+  mesma feature) fica sem anotação e documentado como interno.
+- Operador inativo (RN-09) é barrado no `UserDetailsService`: `enabled=false`.
+
+Job agendado (cobrança) roda sem operador. Mecanismo a definir junto com
+RF-04.1: `SecurityContext` de sistema ou método de service dedicado sem
+anotação, invocado só pelo scheduler da própria feature.
 
 ## Regra de dependência
 
-Setas só apontam para dentro.
+Dentro da feature:
 
 ```
-infrastructure ──> application ──> domain
+web ──> service ──> repository
+ │         │            │
+ └─────────┴──> domain <┘
 ```
 
-- `domain` não importa nada do projeto além de `shared/domain`.
-- `application` não importa `infrastructure`.
-- `infrastructure` implementa as interfaces de `application/port/`. Spring
-  injeta a implementação onde o caso de uso pede a interface.
+- `web` importa `service` e `domain`. Nunca `repository`.
+- `service` importa `repository` e `domain`. Nunca `web`.
+- `repository` importa só `domain`.
+- `domain` não importa nada da feature.
 
-Consequência: trocar JPA por JDBC, ou Stripe por outro gateway, mexe só em
-`infrastructure/`. Testar caso de uso não exige banco nem HTTP, só mock dos
-ports.
+Entre features:
 
-## Ports e adapters
+- Feature A importa de B só `service` e `domain`. Nunca `repository` nem
+  `web`. Se duas features se chamam mutuamente, fronteira está errada.
+- Entity referencia entity de outra feature por id (`planPriceId: UUID`),
+  não por `@ManyToOne`. Service carrega o que a regra precisa e passa por
+  parâmetro. Regra de negócio da entity não chama service nem repository.
 
-| Direção | Port | Adapter |
-|---|---|---|
-| Entrada (driving) | caso de uso em `application/` | `Controller` em `infrastructure/web/` |
-| Saída (driven) | interface em `application/port/` | `RepositoryImpl`, `PaymentGateway` impl em `infrastructure/` |
+Subpacotes exigem classes `public`, então a fronteira é convenção. Quando
+o projeto crescer, teste ArchUnit em `src/test` valida essas setas.
 
-## Exceptions
+## Serviços externos
 
-Cada camada tem exceptions no seu nível de abstração. Base abstrata em
-`shared/`, concretas na feature.
+Gateway de pagamento, envio de email e similares: interface e
+implementação no subpacote `gateway/` da feature que os usa
+(`payment/gateway/PaymentGateway.java`,
+`payment/gateway/StripePaymentGateway.java`). Service depende da interface.
 
-| Camada | Base | Significado | Exemplo |
-|---|---|---|---|
-| `domain` | `DomainException` | regra de negócio violada | `EmailAlreadyInUseException`, `PlanNotFoundException` |
-| `application` | `ApplicationException` | falha de orquestração do caso de uso | `SubscriptionAlreadyActiveException` |
-| `infrastructure` | `InfrastructureException` | falha técnica de adapter | `StripeGatewayException` |
-
-Exception de camada externa nunca sobe crua para dentro. Adapter captura a
-exception técnica e traduz para a exception declarada no port:
+Implementação captura a exception do SDK e traduz para exception declarada
+na interface:
 
 ```java
-// infrastructure/StripePaymentGateway.java
 @Override
-public void charge(UUID subscriberId, BigDecimal amount) {
+public String charge(Subscriber subscriber, BigDecimal amount) {
     try {
-        stripe.charges().create(...);
+        return stripe.charges().create(...).getId();
     } catch (StripeException e) {
         throw new PaymentGatewayException("Stripe charge failed", e);
     }
 }
 ```
 
-`PaymentGatewayException` mora em `application/port/` junto com a interface
-`PaymentGateway`: faz parte do contrato. Caso de uso conhece ela, nunca
-`StripeException`.
+Service conhece `PaymentGatewayException`, nunca `StripeException`.
 
-`GlobalExceptionHandler` em `shared/web/` mapeia por tipo base:
-`NotFoundException` → 404, `DomainException` → 422,
-`ApplicationException` → 409, `InfrastructureException` → 502,
-falha de validação → 400.
+## Exceptions
+
+Bases abstratas transversais **[aberto]** (ver Layout); concretas em
+`<feature>/domain/exception/`.
+
+| Base | Significado | HTTP | Exemplo |
+|---|---|---|---|
+| `NotFoundException` | recurso não existe | 404 | `PlanNotFoundException` |
+| `BusinessRuleException` | regra de negócio violada | 422 | `EmailAlreadyInUseException`, `PaymentNotRefundableException` |
+| `ExternalServiceException` | serviço externo falhou | 502 | `PaymentGatewayException` |
+| `MethodArgumentNotValidException` | Bean Validation | 400 | — |
+| `AccessDeniedException` | sem permissão | 403 | — |
+
+`GlobalExceptionHandler` mapeia por tipo base e responde `ApiError`.
 
 ## Fluxo de uma requisição
 
-`POST /api/users`
+`POST /api/subscribers`
 
-1. `UserController` recebe o JSON. Bean Validation valida `CreateUserRequest`.
-2. `request.toCommand()` gera `CreateUserCommand`. DTO web morre aqui.
-3. `CreateUserUseCase.execute(command)` aplica regras usando `UserRepository`
-   (interface) e cria o `User` de domínio.
-4. Spring injeta `UserRepositoryImpl`, que converte `User` em `UserEntity` e
-   persiste via Hibernate.
-5. `User` volta ao controller. `UserResponse.from(user)` serializa. `201`.
+1. Spring Security autentica o operador e monta authorities.
+2. `SubscriberController` recebe JSON. Bean Validation valida
+   `CreateSubscriberRequest`.
+3. `request.toCommand()` gera `CreateSubscriberCommand`.
+4. `SubscriberService.create(command)`: `@PreAuthorize` checa
+   `MANAGE_SUBSCRIBERS`; service valida email único, busca `PlanPrice` via
+   `PlanService`, chama `Subscriber.start(...)`, salva.
+5. `SubscriberResponse.from(subscriber)`. `201`.
 
-Erro sobe como exception da camada onde nasceu e `GlobalExceptionHandler`
-traduz em status HTTP (ver seção Exceptions).
+Erro sobe como exception e `GlobalExceptionHandler` traduz.
 
-## Dependência entre features
+## Testes
 
-Feature A usa feature B só pelo que B expõe em `domain` e `application`
-(casos de uso e modelos). Nunca por `infrastructure`.
-
-Exemplo: `CreatePlanUseCase` valida o dono chamando
-`user.application.FindUserUseCase`, não `UserJpaRepository`.
-
-Se o acoplamento entre duas features cresce, ou a fronteira está errada ou o
-trecho comum é candidato a `shared/`.
-
-## `shared/`
-
-Código usado por duas ou mais features. Segue a mesma regra de camada:
-`shared/domain` não importa `shared/web`.
-
-- `shared/domain/`: `DomainException`, `NotFoundException`, value objects
-  genéricos, utilitários sem framework.
-- `shared/application/`: `ApplicationException`.
-- `shared/infrastructure/`: `InfrastructureException`, entity base com
-  auditoria, `@ConfigurationProperties`, beans gerais.
-- `shared/web/`: `GlobalExceptionHandler`, `ApiError`, config de CORS e
-  conversores HTTP.
-
-Sinal de alerta: `shared/` maior que uma feature. Algo ali é feature
-disfarçada.
-
-## Visibilidade
-
-- Classes de `infrastructure` são package-private. Nada fora da feature
-  precisa enxergar `UserEntity` ou `UserController`.
-- `domain`, `application` e `application/port` são `public`: são a API da
-  feature para as outras.
+- Entity: teste unitário puro. Sem Spring. Cobre regras de transição.
+- Service: `@ExtendWith(MockitoExtension)`, repository e outras services
+  mockados. Sem banco, sem HTTP.
+- Autorização: teste de service com `@WithMockUser(authorities = ...)` em
+  contexto Spring mínimo, ou teste de integração por endpoint.
+- Controller: `@WebMvcTest` com service mockada. Cobre validação e
+  serialização.
+- Repository com `Specification`: `@DataJpaTest` com Testcontainers.
 
 ## Configuração
 
@@ -188,18 +321,22 @@ Arquivo `.env` (ignorado pelo git) é carregado via `spring.config.import`.
 `.env.example` documenta as chaves. Credenciais reais nunca entram no
 repositório, só o default do banco local do `docker-compose.yaml`.
 
+`Clock` é bean injetável; entity recebe `Instant` por parâmetro. Teste
+controla o tempo.
+
 ## Convenções de nome
 
 | Tipo | Padrão | Exemplo |
 |---|---|---|
-| Modelo de domínio | substantivo | `Plan` |
+| Entity | substantivo | `Plan` |
 | Exception | `<Coisa><Problema>Exception` | `PlanNotFoundException` |
-| Caso de uso | `<Verbo><Coisa>UseCase` | `CreatePlanUseCase` |
+| Service | `<Coisa>Service` | `PlanService` |
+| Método de service | verbo | `create`, `cancel`, `search` |
 | Comando | `<Verbo><Coisa>Command` | `CreatePlanCommand` |
-| Port de saída | `<Coisa>Repository`, `<Coisa>Gateway` | `PlanRepository` |
-| Entity JPA | `<Coisa>Entity` | `PlanEntity` |
-| Spring Data | `<Coisa>JpaRepository` | `PlanJpaRepository` |
-| Impl do port | `<Coisa>RepositoryImpl` | `PlanRepositoryImpl` |
+| Repository | `<Coisa>Repository` | `PlanRepository` |
+| Interface externa | `<Coisa>Gateway`, `<Coisa>Sender` | `PaymentGateway` |
+| Impl externa | `<Fornecedor><Interface>` | `StripePaymentGateway` |
 | Request/Response | `<Verbo><Coisa>Request`, `<Coisa>Response` | `CreatePlanRequest` |
 | Controller | `<Coisa>Controller` | `PlanController` |
 | Rota | `/api/<coisas>` plural | `/api/plans` |
+| Tabela | snake_case plural | `plan_prices` |

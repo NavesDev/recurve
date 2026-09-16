@@ -86,7 +86,8 @@ ainda não foram definidos.
 ## Requisitos não funcionais
 
 - RNF-01 Backend Spring Boot, Java 25, PostgreSQL, Hibernate/JPA.
-- RNF-02 Clean Architecture, package by feature (ver
+- RNF-02 Arquitetura em camadas, package by feature, entity com regra de
+  negócio, autorização na service (ver
   `server/docs/architecture.md`).
 - RNF-03 Configuração via variável de ambiente; nenhuma credencial real no
   repositório.

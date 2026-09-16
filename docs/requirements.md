@@ -20,7 +20,7 @@ ainda não foram definidos.
 - RF-01.1 Cadastrar operador com nome, email único e senha.
 - RF-01.2 Atribuir e remover permissões de um operador.
 - RF-01.3 Desativar operador sem excluir. Operador inativo não autentica.
-- RF-01.4 Listar operadores e suas permissões.
+- RF-01.4 Listar operadores e suas permissões (ver RF-06.1).
 
 ### RF-02 Planos
 
@@ -30,7 +30,7 @@ ainda não foram definidos.
 - RF-02.3 Desativar preço. Preço inativo não aceita novos assinantes;
   assinantes existentes permanecem nele.
 - RF-02.4 Desativar plano. Plano inativo não aceita novos assinantes.
-- RF-02.5 Listar planos com seus preços.
+- RF-02.5 Listar planos com seus preços (ver RF-06.2).
 
 ### RF-03 Assinantes
 
@@ -39,7 +39,7 @@ ainda não foram definidos.
   `nextBillingAt` calculado a partir do intervalo do preço.
 - RF-03.3 Cancelar assinante. Status vira `CANCELED`, `canceledAt`
   preenchido. Não gera novas cobranças.
-- RF-03.4 Listar assinantes, filtrando por status e plano.
+- RF-03.4 Listar assinantes (ver RF-06.3).
 - RF-03.5 **[aberto]** Trocar assinante de preço (upgrade/downgrade).
 - RF-03.6 **[aberto]** Reativar assinante cancelado.
 
@@ -64,6 +64,39 @@ ainda não foram definidos.
 - RF-05.2 Toda operação exige permissão correspondente (ver RN-01).
 - RF-05.3 **[aberto]** Mecanismo de sessão (JWT, cookie de sessão).
 
+### RF-06 Busca, filtro e ordenação
+
+Aplica-se às listagens. Busca é texto livre, case-insensitive, por trecho
+(`%q%`). Filtros combinam com AND; valores múltiplos do mesmo filtro com
+OR. Ordenação aceita um campo e direção (`asc`/`desc`); campo fora da
+lista permitida é erro de validação. Toda listagem é paginada.
+
+#### RF-06.1 Operadores
+
+- Busca por `name` e `email`.
+- Ordenação padrão: `name` asc.
+
+#### RF-06.2 Planos
+
+- Busca por `name`.
+- Filtro por ciclo: plano que possui ao menos um preço **ativo** com o
+  intervalo informado (`MONTHLY`, `YEARLY`).
+- Ordenação por número de assinaturas: contagem de assinantes com status
+  diferente de `CANCELED` em qualquer preço do plano.
+- **[aberto]** Ordenação por preço. Plano tem N preços; depende de fixar
+  intervalo e moeda.
+- Ordenação padrão: `name` asc.
+
+#### RF-06.3 Assinantes
+
+- Busca por `name` e `email`.
+- Filtro por `status` (múltiplo).
+- Filtro por plano (`planId`): assinante cujo preço pertence ao plano.
+- Ordenação por data de início (`startedAt`).
+- Ordenação por valor cobrado: valor do preço ao qual o assinante está
+  vinculado.
+- Ordenação padrão: `startedAt` desc.
+
 ## Regras de negócio
 
 - RN-01 Permissões por recurso: `VIEW_*` e `MANAGE_*` para `USERS`,
@@ -82,6 +115,8 @@ ainda não foram definidos.
 - RN-07 Assinante `CANCELED` não gera cobrança.
 - RN-08 Estorno só de pagamento `PAID`.
 - RN-09 Operador inativo não autentica nem executa operações.
+- RN-10 Número de assinaturas de um plano conta assinantes `ACTIVE` e
+  `PAST_DUE`; `CANCELED` não conta.
 
 ## Requisitos não funcionais
 

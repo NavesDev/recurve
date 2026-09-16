@@ -18,7 +18,7 @@ Princípios:
 
 ```
 ┌────────────────────────────────────────────────────────────┐
-│  APRESENTAÇÃO                                    web/      │
+│  APRESENTAÇÃO                                 controller/  │
 │  Recebe entrada externa, valida forma, converte pra        │
 │  comando. Converte resultado em saída externa.             │
 └──────────────────────────┬─────────────────────────────────┘
@@ -62,7 +62,7 @@ src/main/java/com/navesdev/recurve/
     │   └── exception/    # exceptions de negócio da feature
     ├── repository/       # Spring Data, Specifications
     ├── service/          # Service, Commands, Filters
-    └── web/              # Controller, Request, Response
+    └── controller/            # Controller, Request, Response
 ```
 
 Toda feature segue as quatro subpastas. Subpasta extra só para adapter de
@@ -186,10 +186,10 @@ public class SubscriberService {
 ```
 
 Entrada da service é `record` de comando (`CreateSubscriberCommand`), ids
-ou `record` de filtro. Request web nunca chega na service. Saída é a
+ou `record` de filtro. Request HTTP nunca chega na service. Saída é a
 entity (ou `Page<Entity>`).
 
-### Apresentação (`web/`)
+### Apresentação (`controller/`)
 
 `@RestController`. Converte HTTP em chamada de service e resultado em
 response. Sem regra, sem `@PreAuthorize` (já está na service).
@@ -223,20 +223,20 @@ anotação, invocado só pelo scheduler da própria feature.
 Dentro da feature:
 
 ```
-web ──> service ──> repository
- │         │            │
- └─────────┴──> domain <┘
+controller ──> service ──> repository
+     │              │             │
+     └──────────────┴──> domain <┘
 ```
 
-- `web` importa `service` e `domain`. Nunca `repository`.
-- `service` importa `repository` e `domain`. Nunca `web`.
+- `controller` importa `service` e `domain`. Nunca `repository`.
+- `service` importa `repository` e `domain`. Nunca `controller`.
 - `repository` importa só `domain`.
 - `domain` não importa nada da feature.
 
 Entre features:
 
 - Feature A importa de B só `service` e `domain`. Nunca `repository` nem
-  `web`. Se duas features se chamam mutuamente, fronteira está errada.
+  `controller`. Se duas features se chamam mutuamente, fronteira está errada.
 - Entity referencia entity de outra feature por id (`planPriceId: UUID`),
   não por `@ManyToOne`. Service carrega o que a regra precisa e passa por
   parâmetro. Regra de negócio da entity não chama service nem repository.

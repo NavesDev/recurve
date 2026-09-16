@@ -7,7 +7,7 @@ transversal vive em `shared/`.
 ## Layout
 
 ```
-server/src/main/java/com/navesdev/recurve/
+src/main/java/com/navesdev/recurve/
 ├── RecurveApplication.java
 ├── shared/
 │   ├── domain/           # DomainException, value objects, utilitários puros

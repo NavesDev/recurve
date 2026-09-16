@@ -1,158 +1,187 @@
-# Requisitos
+# Requirements
 
-Recurve: motor de cobrança recorrente e gestão de assinaturas.
+Recurve: recurring billing and subscription management engine.
 
-Documento consolida o que foi decidido até agora. Itens marcados **[aberto]**
-ainda não foram definidos.
+This document consolidates what has been decided so far. Items marked
+**[open]** are not yet defined. It describes behavior, not implementation;
+names here are business terms, not code identifiers.
 
-## Atores
+## Actors
 
-| Ator | Descrição |
+| Actor | Description |
 |---|---|
-| Operador (`User`) | Pessoa que usa o sistema. Acesso limitado por permissões granulares |
-| Assinante (`Subscriber`) | Cliente que assina um plano. Não acessa o sistema |
-| Gateway de pagamento | Serviço externo que processa cobranças. **[aberto]** qual |
+| Operator | Person who uses the system. Access limited by granular permissions |
+| Subscriber | Customer who subscribes to a plan. Does not access the system |
+| Payment gateway | External service that processes charges. **[open]** which one |
 
-## Requisitos funcionais
+## Functional requirements
 
-### RF-01 Operadores
+### FR-01 Operators
 
-- RF-01.1 Cadastrar operador com nome, email único e senha.
-- RF-01.2 Atribuir e remover permissões de um operador.
-- RF-01.3 Desativar operador sem excluir. Operador inativo não autentica.
-- RF-01.4 Listar operadores e suas permissões (ver RF-06.1).
+- FR-01.1 Register an operator with name, unique email and password.
+- FR-01.2 Grant and revoke permissions of an operator.
+- FR-01.3 Deactivate an operator without deleting. Inactive operator cannot
+  sign in.
+- FR-01.4 List operators and their permissions (see FR-06.1).
 
-### RF-02 Planos
+### FR-02 Plans
 
-- RF-02.1 Cadastrar plano com nome e descrição opcional.
-- RF-02.2 Cadastrar um ou mais preços para o plano, cada um com valor,
-  moeda e intervalo (`MONTHLY`, `YEARLY`).
-- RF-02.3 Desativar preço. Preço inativo não aceita novos assinantes;
-  assinantes existentes permanecem nele.
-- RF-02.4 Desativar plano. Plano inativo não aceita novos assinantes.
-- RF-02.5 Listar planos com seus preços (ver RF-06.2).
+- FR-02.1 Register a plan with name and optional description.
+- FR-02.2 Register one or more prices for a plan, each with amount,
+  currency and billing cycle (monthly, yearly).
+- FR-02.3 Deactivate a price. Inactive price accepts no new subscribers;
+  existing subscribers stay on it.
+- FR-02.4 Deactivate a plan. Inactive plan accepts no new subscribers.
+- FR-02.5 List plans with their prices (see FR-06.2).
 
-### RF-03 Assinantes
+### FR-03 Subscribers
 
-- RF-03.1 Cadastrar assinante com nome, email único e preço de plano.
-- RF-03.2 Assinante nasce `ACTIVE` com `startedAt` = agora e
-  `nextBillingAt` calculado a partir do intervalo do preço.
-- RF-03.3 Cancelar assinante. Status vira `CANCELED`, `canceledAt`
-  preenchido. Não gera novas cobranças.
-- RF-03.4 Listar assinantes (ver RF-06.3).
-- RF-03.5 **[aberto]** Trocar assinante de preço (upgrade/downgrade).
-- RF-03.6 **[aberto]** Reativar assinante cancelado.
+- FR-03.1 Register a subscriber with name, unique email and a plan price.
+- FR-03.2 New subscriber starts as active, with start date set to now and
+  next billing date one cycle ahead, according to the chosen price.
+- FR-03.3 Cancel a subscriber. Status becomes canceled and cancellation
+  date is recorded. No further charges are generated.
+- FR-03.4 List subscribers (see FR-06.3).
+- FR-03.5 **[open]** Move a subscriber to another price (upgrade/downgrade).
+- FR-03.6 **[open]** Reactivate a canceled subscriber.
 
-### RF-04 Pagamentos
+### FR-04 Payments
 
-- RF-04.1 Gerar cobrança (`Payment` `PENDING`) para assinante quando
-  `nextBillingAt` vence. Valor e moeda copiados do preço no momento.
-- RF-04.2 Confirmar pagamento: status `PAID`, `paidAt` preenchido,
-  assinante volta/permanece `ACTIVE`, `nextBillingAt` avança um intervalo.
-- RF-04.3 Registrar falha: status `FAILED`. Assinante vira `PAST_DUE`.
-- RF-04.4 Estornar pagamento pago: status `REFUNDED`.
-- RF-04.5 Registrar pagamento manual (sem gateway), com `externalId` vazio.
-- RF-04.6 Listar pagamentos por assinante e por status.
-- RF-04.7 **[aberto]** Integração com gateway: criar cobrança, receber
-  webhook de confirmação/falha, localizar `Payment` por `externalId`.
-- RF-04.8 **[aberto]** Política de retentativa e prazo até cancelar
-  assinante `PAST_DUE`.
+- FR-04.1 Generate a pending charge for a subscriber when the next billing
+  date is reached. Amount and currency are copied from the price at that
+  moment.
+- FR-04.2 Confirm a payment: status becomes paid, payment date is
+  recorded, subscriber becomes or stays active, next billing date advances
+  one cycle.
+- FR-04.3 Record a failure: status becomes failed. Subscriber becomes past
+  due.
+- FR-04.4 Refund a paid payment: status becomes refunded.
+- FR-04.5 Record a manual payment (no gateway involved).
+- FR-04.6 List payments by subscriber and by status.
+- FR-04.7 **[open]** Gateway integration: create charge, receive
+  confirmation/failure webhook, match the payment by the gateway's
+  transaction id.
+- FR-04.8 **[open]** Retry policy and grace period before a past-due
+  subscriber is canceled.
 
-### RF-05 Autenticação e autorização
+### FR-05 Authentication and authorization
 
-- RF-05.1 Operador autentica com email e senha.
-- RF-05.2 Toda operação exige permissão correspondente (ver RN-01).
-- RF-05.3 **[aberto]** Mecanismo de sessão (JWT, cookie de sessão).
+- FR-05.1 Operator signs in with email and password.
+- FR-05.2 Every operation requires the corresponding permission (see BR-01).
+- FR-05.3 **[open]** Session mechanism (token, session cookie).
 
-### RF-06 Busca, filtro e ordenação
+### FR-06 Search, filter and sort
 
-Aplica-se às listagens. Busca é texto livre, case-insensitive, por trecho
-(`%q%`). Filtros combinam com AND; valores múltiplos do mesmo filtro com
-OR. Ordenação aceita um campo e direção (`asc`/`desc`); campo fora da
-lista permitida é erro de validação. Toda listagem é paginada (RF-07).
+Applies to listings. Search is free text, case-insensitive, by substring.
+Filters combine with AND; multiple values of the same filter combine with
+OR. Sort accepts one field and a direction (ascending/descending); a field
+outside the allowed list is a validation error. Every listing is paginated
+(FR-07).
 
-#### RF-06.1 Operadores
+#### FR-06.1 Operators
 
-- Busca por `name` e `email`.
-- Ordenação padrão: `name` asc.
+- Search by name and email.
+- Default sort: name ascending.
 
-#### RF-06.2 Planos
+#### FR-06.2 Plans
 
-- Busca por `name`.
-- Filtro por ciclo: plano que possui ao menos um preço **ativo** com o
-  intervalo informado (`MONTHLY`, `YEARLY`).
-- Ordenação por número de assinaturas: contagem de assinantes com status
-  diferente de `CANCELED` em qualquer preço do plano.
-- **[aberto]** Ordenação por preço. Plano tem N preços; depende de fixar
-  intervalo e moeda.
-- Ordenação padrão: `name` asc.
+- Search by name.
+- Filter by billing cycle: plan that has at least one **active** price with
+  the given cycle.
+- Sort by number of subscriptions (see BR-10).
+- **[open]** Sort by price. A plan has many prices; depends on fixing cycle
+  and currency.
+- Default sort: name ascending.
 
-#### RF-06.3 Assinantes
+#### FR-06.3 Subscribers
 
-- Busca por `name` e `email`.
-- Filtro por `status` (múltiplo).
-- Filtro por plano (`planId`): assinante cujo preço pertence ao plano.
-- Ordenação por data de início (`startedAt`).
-- Ordenação por valor cobrado: valor do preço ao qual o assinante está
-  vinculado.
-- Ordenação padrão: `startedAt` desc.
+- Search by name and email.
+- Filter by status (multiple).
+- Filter by plan: subscriber whose price belongs to the plan.
+- Sort by start date.
+- Sort by billed amount: amount of the price the subscriber is linked to.
+- Default sort: start date descending.
 
-### RF-07 Paginação
+### FR-07 Pagination
 
-Aplica-se a toda listagem (operadores, planos, assinantes, pagamentos).
-Paginação por offset.
+Applies to every listing (operators, plans, subscribers, payments).
+Offset-based.
 
-- RF-07.1 Parâmetros `page` (base 0, padrão 0) e `size` (padrão 20,
-  máximo 100). Valor fora da faixa é erro de validação.
-- RF-07.2 Resposta contém os itens da página, `page`, `size` e `total`
-  (contagem após busca e filtro, antes de paginar).
-- RF-07.3 Página além do fim retorna lista vazia com `total` correto; não
-  é erro.
-- RF-07.4 Ordenação estável: quando o campo de ordenação tem empate,
-  desempata por `id`. Garante que item não repete nem some entre páginas.
-- RF-07.5 Busca, filtro e ordenação (RF-06) aplicam antes da paginação.
+- FR-07.1 Parameters: page number (zero-based, default 0) and page size
+  (default 20, maximum 100). Out-of-range value is a validation error.
+- FR-07.2 Response contains the page items, page number, page size and
+  total count (after search and filter, before pagination).
+- FR-07.3 Page beyond the end returns an empty list with the correct
+  total; not an error.
+- FR-07.4 Stable ordering: ties on the sort field are broken by a fixed
+  secondary key, so an item never repeats or disappears between pages.
+- FR-07.5 Search, filter and sort (FR-06) apply before pagination.
 
-## Regras de negócio
+## Business rules
 
-- RN-01 Permissões por recurso: `VIEW_*` e `MANAGE_*` para `USERS`,
-  `PLANS`, `SUBSCRIBERS`, `PAYMENTS`. `MANAGE_*` implica `VIEW_*`.
-- RN-02 Email de operador é único. Email de assinante é único.
-- RN-03 Plano não tem preço próprio; preço e intervalo vivem em `PlanPrice`.
-  Um plano pode ter vários preços ativos, no máximo um por
-  `(intervalo, moeda)`.
-- RN-04 Alterar preço nunca edita `PlanPrice` existente: cria novo e
-  desativa o antigo. Histórico preservado.
-- RN-05 `Payment` guarda snapshot de valor e moeda. Mudança de preço não
-  altera cobranças já geradas.
-- RN-06 `nextBillingAt` é estado persistido, não derivado de `startedAt`.
-  Muda somente por evento de domínio (pagamento confirmado, troca de preço,
-  reativação).
-- RN-07 Assinante `CANCELED` não gera cobrança.
-- RN-08 Estorno só de pagamento `PAID`.
-- RN-09 Operador inativo não autentica nem executa operações.
-- RN-10 Número de assinaturas de um plano conta assinantes `ACTIVE` e
-  `PAST_DUE`; `CANCELED` não conta.
+- BR-01 Permissions per resource: a view permission and a manage
+  permission for each of operators, plans, subscribers and payments.
+  Manage implies view.
+- BR-02 Operator email is unique. Subscriber email is unique.
+- BR-03 A plan has no price of its own; amount and cycle live in the
+  price. A plan may have several active prices, at most one per
+  (cycle, currency).
+- BR-04 Changing a price never edits an existing one: a new price is
+  created and the old one deactivated. History is preserved.
+- BR-05 A payment stores a snapshot of amount and currency. Changing a
+  price does not alter charges already generated.
+- BR-06 Next billing date is persisted state, not derived from start date.
+  It changes only by a domain event (payment confirmed, price change,
+  reactivation).
+- BR-07 A canceled subscriber generates no charge.
+- BR-08 Only a paid payment can be refunded.
+- BR-09 An inactive operator can neither sign in nor perform operations.
+- BR-10 A plan's number of subscriptions counts active and past-due
+  subscribers; canceled ones do not count.
 
-## Requisitos não funcionais
+## Subscriber status
 
-- RNF-01 Backend Spring Boot, Java 25, PostgreSQL, Hibernate/JPA.
-- RNF-02 Arquitetura em camadas, package by feature, entity com regra de
-  negócio, autorização na service (ver
-  `server/docs/architecture.md`).
-- RNF-03 Configuração via variável de ambiente; nenhuma credencial real no
-  repositório.
-- RNF-04 Senha de operador armazenada como hash. **[aberto]** algoritmo
+| Status | Meaning |
+|---|---|
+| Active | up to date |
+| Past due | a charge was due and not paid |
+| Canceled | ended; cancellation date recorded |
+
+```
+active ──charge fails──► past due ──payment confirmed──► active
+                            │
+                            └──grace period ends (FR-04.8 open)──► canceled
+```
+
+## Payment status
+
+| Status | Meaning |
+|---|---|
+| Pending | created, awaiting payment |
+| Paid | confirmed, payment date recorded |
+| Failed | gateway declined or due date passed without payment |
+| Refunded | reversed |
+
+## Non-functional requirements
+
+- NFR-01 Backend: Spring Boot, Java 25, PostgreSQL.
+- NFR-02 Layered architecture, organized by feature. Documented separately
+  in the server.
+- NFR-03 Configuration via environment variables; no real credential in
+  the repository.
+- NFR-04 Operator password stored as a hash. **[open]** algorithm
   (BCrypt/Argon2).
-- RNF-05 Timestamps em UTC.
-- RNF-06 Valores monetários em `BigDecimal`, escala 2, moeda ISO 4217.
-- RNF-07 Casos de uso testáveis sem banco e sem HTTP (ports mockados).
-- RNF-08 **[aberto]** Migrações de schema com Flyway quando modelo
-  estabilizar; `ddl-auto: update` só em desenvolvimento.
-- RNF-09 **[aberto]** Frontend (`web/`): stack e escopo.
+- NFR-05 Timestamps in UTC.
+- NFR-06 Monetary amounts with two decimal places; currency as ISO 4217
+  code.
+- NFR-07 Business logic testable without database and without HTTP.
+- NFR-08 **[open]** Schema migrations with Flyway once the model
+  stabilizes; automatic schema update only in development.
+- NFR-09 **[open]** Frontend: stack and scope.
 
-## Fora de escopo por enquanto
+## Out of scope for now
 
-- Múltiplos tenants / empresas.
-- Cupons, descontos, trial.
-- Notificação ao assinante (email, WhatsApp).
-- Nota fiscal.
+- Multiple tenants / companies.
+- Coupons, discounts, trial.
+- Subscriber notifications (email, WhatsApp).
+- Invoicing.

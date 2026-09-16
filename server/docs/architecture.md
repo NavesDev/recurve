@@ -212,10 +212,10 @@ Spring Security com method security habilitada
   features também passam pela checagem.
 - Método interno que não deve ser checado (chamado só por outra service da
   mesma feature) fica sem anotação e documentado como interno.
-- Operador inativo (RN-09) é barrado no `UserDetailsService`: `enabled=false`.
+- Operador inativo (BR-09) é barrado no `UserDetailsService`: `enabled=false`.
 
 Job agendado (cobrança) roda sem operador. Mecanismo a definir junto com
-RF-04.1: `SecurityContext` de sistema ou método de service dedicado sem
+FR-04.1: `SecurityContext` de sistema ou método de service dedicado sem
 anotação, invocado só pelo scheduler da própria feature.
 
 ## Regra de dependência

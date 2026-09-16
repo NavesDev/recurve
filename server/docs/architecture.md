@@ -299,14 +299,43 @@ Erro sobe como exception e `GlobalExceptionHandler` traduz.
 
 ## Testes
 
-- Entity: teste unitário puro. Sem Spring. Cobre regras de transição.
-- Service: `@ExtendWith(MockitoExtension)`, repository e outras services
-  mockados. Sem banco, sem HTTP.
-- Autorização: teste de service com `@WithMockUser(authorities = ...)` em
-  contexto Spring mínimo, ou teste de integração por endpoint.
-- Controller: `@WebMvcTest` com service mockada. Cobre validação e
-  serialização.
-- Repository com `Specification`: `@DataJpaTest` com Testcontainers.
+Mesma estrutura do código: pacote por feature, subpasta por camada. Teste
+de `subscriber/service/SubscriberService` vive em
+`subscriber/service/SubscriberServiceTest`.
+
+Dois source sets, separados pelo que precisam pra rodar:
+
+```
+src/test/java/com/navesdev/recurve/          # unitário: sem Spring, sem banco
+└── subscriber/
+    ├── domain/
+    │   └── SubscriberTest.java
+    ├── service/
+    │   └── SubscriberServiceTest.java
+    └── controller/
+        └── SubscriberControllerTest.java
+
+src/integrationTest/java/com/navesdev/recurve/   # contexto Spring, banco real
+└── subscriber/
+    ├── repository/
+    │   └── SubscriberRepositoryIT.java
+    └── SubscriberApiIT.java                     # endpoint ponta a ponta
+```
+
+| Camada | Source set | Ferramenta | Cobre |
+|---|---|---|---|
+| Domínio | `test` | JUnit puro | regras de transição, invariantes |
+| Aplicação | `test` | Mockito; repository e outras services mockados | orquestração, unicidade, exceptions |
+| Apresentação | `test` | `@WebMvcTest` com service mockada | validação de request, serialização, status HTTP |
+| Persistência | `integrationTest` | `@DataJpaTest` + Testcontainers | `Specification`, queries customizadas |
+| Autorização | `integrationTest` | `@SpringBootTest` + `@WithMockUser(authorities = ...)` | `@PreAuthorize` por caso de uso |
+| Endpoint | `integrationTest` | `@SpringBootTest` + `MockMvc` + Testcontainers | fluxo completo por feature |
+
+Sufixo: `*Test` em `test`, `*IT` em `integrationTest`. `mvn test` roda só
+unitários; `mvn verify` roda os dois.
+
+Teste que não cabe em uma camada (endpoint ponta a ponta) fica na raiz do
+pacote da feature.
 
 ## Configuração
 

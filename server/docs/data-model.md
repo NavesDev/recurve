@@ -26,13 +26,19 @@ cargo.
 
 ### Permission (enum, `user/domain`)
 
+Uma permissão de leitura e uma de escrita por recurso. `MANAGE_*` implica o
+`VIEW_*` correspondente; checagem de leitura aceita qualquer um dos dois.
+
 | Valor | Cobre |
 |---|---|
-| `MANAGE_USERS` | criar/editar operadores e suas permissões |
+| `VIEW_USERS` | listar operadores e suas permissões |
+| `MANAGE_USERS` | criar/editar/desativar operadores e permissões |
+| `VIEW_PLANS` | listar planos e preços |
 | `MANAGE_PLANS` | criar/editar/desativar planos e preços |
+| `VIEW_SUBSCRIBERS` | listar assinantes |
 | `MANAGE_SUBSCRIBERS` | criar/cancelar assinantes |
+| `VIEW_PAYMENTS` | listar pagamentos |
 | `MANAGE_PAYMENTS` | registrar/estornar pagamentos |
-| `VIEW_REPORTS` | leitura de tudo |
 
 ## Plan
 

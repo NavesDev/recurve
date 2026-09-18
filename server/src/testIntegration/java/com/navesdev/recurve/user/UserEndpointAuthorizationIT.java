@@ -28,7 +28,9 @@ import org.springframework.transaction.annotation.Transactional;
 
 import com.navesdev.recurve.user.domain.Permission;
 import com.navesdev.recurve.user.domain.User;
+import com.navesdev.recurve.user.domain.UserSummary;
 import com.navesdev.recurve.user.repository.UserRepository;
+import com.navesdev.recurve.user.repository.UserSearchRepository;
 
 import jakarta.persistence.EntityManager;
 import jakarta.persistence.PersistenceContext;
@@ -54,6 +56,9 @@ class UserEndpointAuthorizationIT {
     private UserRepository repository;
 
     @Autowired
+    private UserSearchRepository searchRepository;
+
+    @Autowired
     private PasswordEncoder passwordEncoder;
 
     @PersistenceContext
@@ -61,6 +66,9 @@ class UserEndpointAuthorizationIT {
 
     @BeforeEach
     void setUp() {
+        // The database write rolls back with the test; the index does not,
+        // so it is rebuilt from scratch instead.
+        searchRepository.recreateIndex();
         entityManager.createNativeQuery("TRUNCATE users CASCADE").executeUpdate();
 
         // Distinct names on purpose: sorting by name has nothing to say
@@ -212,6 +220,6 @@ class UserEndpointAuthorizationIT {
         if (!active) {
             operator.deactivate();
         }
-        repository.save(operator);
+        searchRepository.save(UserSummary.of(repository.save(operator)));
     }
 }

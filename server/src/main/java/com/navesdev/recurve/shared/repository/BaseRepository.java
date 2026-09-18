@@ -2,12 +2,11 @@ package com.navesdev.recurve.shared.repository;
 
 import java.util.Optional;
 
-import org.springframework.data.jpa.repository.JpaSpecificationExecutor;
 import org.springframework.data.repository.NoRepositoryBean;
 import org.springframework.data.repository.Repository;
 
 /**
- * The contract every repository in the project follows.
+ * The contract every JPA repository in the project follows.
  *
  * <p>It deliberately does not extend {@code JpaRepository}. That interface
  * carries a wide surface — {@code deleteAll}, {@code saveAll}, an
@@ -18,10 +17,9 @@ import org.springframework.data.repository.Repository;
  * (FR-03.3). A repository that cannot delete makes that structural rather
  * than a matter of discipline.
  *
- * <p>{@link JpaSpecificationExecutor} comes along because dynamic filters
- * (FR-06) are derived by Spring Data, not declarable by hand. It carries a
- * specification-based delete of its own; that one is unused, and a code
- * review is what keeps it that way.
+ * <p>No listing either: search, filter, sort and pagination (FR-06,
+ * FR-07) are served from the search index, by the feature's search
+ * repository, never from a JPA query.
  *
  * <p>A feature's repository adds only what its use cases need — a lookup
  * by a natural key, an existence check — and nothing that circumvents the
@@ -31,7 +29,7 @@ import org.springframework.data.repository.Repository;
  * @param <I> its identifier type
  */
 @NoRepositoryBean
-public interface BaseRepository<T, I> extends Repository<T, I>, JpaSpecificationExecutor<T> {
+public interface BaseRepository<T, I> extends Repository<T, I> {
 
     <S extends T> S save(S entity);
 

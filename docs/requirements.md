@@ -76,7 +76,8 @@ names here are business terms, not code identifiers.
 
 ### FR-06 Search, filter and sort
 
-Applies to listings. Search is free text, case-insensitive, by substring.
+Applies to listings. Search is free text, case-insensitive, matching the
+start of any word of the searched fields; every word typed must match.
 Filters combine with AND; multiple values of the same filter combine with
 OR. Sort accepts one field, ascending or descending; the direction is part
 of naming the field rather than a separate choice, so that sorting on more
@@ -87,6 +88,9 @@ offer — neither is an empty result. Every listing is paginated (FR-07).
 Filters are named, not positional: a listing offers a set of filterable
 fields and a caller states which of them it wants and with what values.
 Which fields a listing offers is part of that listing's contract.
+
+Listings are served from a search index, kept in step with the database
+on every write and rebuildable from it on request (FR-01.5).
 
 #### FR-06.1 Operators
 

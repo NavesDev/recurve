@@ -33,7 +33,7 @@ APPLICATION    service/      create/update/deactivate: JPA save + index
                              search: ES only        reindex: PostgreSQL → ES
 DOMAIN         domain/       User (@Entity, write model)   UserSummary (@Document, read model)
 PERSISTENCE    repository/   UserRepository (JPA)   UserSearchRepository (ES)   UserSearchQueries (DSL)
-shared/config                SearchIndexInitializer — creates indexes at boot (the ES "Flyway")
+user/service                 UserIndexBootstrap — creates the index at boot (the ES "Flyway"); in the feature, because shared/ never imports one
 ```
 
 ES is persistence: a second store beside PostgreSQL. PostgreSQL is the
@@ -71,7 +71,7 @@ testIntegration) so ITs use `test-users` and never touch `users`.
 
 ## Domain
 
-`UserSummary`: record, `@Document(indexName = "#{@indexNames.users}")`,
+`UserSummary`: record, `@Document(indexName = "#{@environment.getProperty('recurve.search.index-prefix', '')}users")`,
 fields `id`, `name`, `email`, `permissions`, `active`, `createdAt`. No
 `passwordHash` by construction. Factory `UserSummary.of(User)`. No rules.
 
@@ -93,11 +93,11 @@ administrative operation with no read counterpart.
 
 ## Persistence
 
-`UserSearchRepository`: minimal surface in the spirit of `BaseRepository` —
-`save`, `saveAll`, `search(UserFilter, Pageable): Page<UserSummary>` via a
-fragment `UserSearchRepositoryImpl` using `ElasticsearchOperations` +
-`NativeQuery`. No delete exposed; reindex recreates the index via
-`IndexOperations`.
+`UserSearchRepository`: a `@Repository` class over `ElasticsearchOperations`
+with a minimal surface in the spirit of `BaseRepository` — `save`,
+`saveAll`, `search(UserFilter, Pageable): Page<UserSummary>`,
+`indexExists`, `recreateIndex`, `refresh`. No delete exposed; reindex
+recreates the index via `IndexOperations`.
 
 `UserSearchQueries.from(UserFilter, Pageable)` replaces
 `UserSpecifications`: `bool` with a `multi_match` on `name`/`email` when
@@ -109,8 +109,9 @@ field (`name.keyword`, `email.keyword`, `createdAt`) then `id` asc,
 `UserRepository` gains `Stream<User> streamAll()` (`@Query`), documented
 as "for reindex, not for listing".
 
-`SearchIndexInitializer` (in `shared/config`): at boot, for each known
-index, if absent → create with settings + mapping from JSON and run that
+`UserIndexBootstrap` (in `user/service`, ordered before
+`OperatorBootstrap`, which also indexes the admin it creates): at boot,
+if the index is absent → create with settings + mapping from JSON and run that
 index's reindex. An existing index is left alone; a mapping change is a
 manual reindex through the endpoint, which recreates it. Failure to
 create the index stops the application.

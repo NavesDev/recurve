@@ -13,6 +13,12 @@ Principles:
 - Interfaces only where swapping the implementation is plausible: external
   services (payment gateway, email). Repositories are plain Spring Data.
 - Authorization via `@PreAuthorize` on the service.
+- Two stores. PostgreSQL holds the write model and is the source of
+  truth; Elasticsearch holds a read model per listing and serves every
+  search, filter, sort and page (FR-06, FR-07). Nothing above the
+  service knows there are two.
+- Fail-fast. The system prefers to stop and make noise over continuing
+  inconsistently in silence.
 
 ## Layers
 
@@ -46,7 +52,7 @@ Arrows only point downward.
 | Presentation | external protocol (HTTP, JSON) | external protocol | Application, Domain | Persistence |
 | Application | command, id, filter | domain model | Domain, Persistence, another feature's Application | Presentation |
 | Domain | primitive values, another model | model, business exception | nothing from the feature | any layer |
-| Persistence | model, `Specification`, `Pageable` | model | Domain | Application, Presentation |
+| Persistence | model, filter, `Pageable` | model, read model | Domain | Application, Presentation |
 
 ## Layout
 
@@ -112,6 +118,12 @@ JPA in the domain: **mapping annotations only** (`@Entity`, `@Table`,
 `@Column`, `@Id`, `@Enumerated`). No `EntityManager`, `@Query`,
 `@Transactional`. The domain knows it is persisted; it does not know how.
 
+A listing's read model lives here too — `UserSummary`, a record of what
+the listing shows, with `@Document` and its mapping annotations and a
+factory from the entity. It is a projection: it holds no rule and can be
+rebuilt from the entity at any time. The same discipline applies as for
+JPA: mapping annotations only, and the password hash has no field.
+
 ```java
 @Entity
 @Table(name = "subscribers")
@@ -149,22 +161,34 @@ public class Subscriber {
 
 ### Persistence (`repository/`)
 
-Spring Data interface. Every repository extends
-`shared/repository/BaseRepository`, which fixes the minimum surface —
-`save`, `findById`, `existsById`, `count`, plus specification-based
-listing — and stops there.
+Two repositories per listed feature.
 
+The JPA repository is a Spring Data interface extending
+`shared/repository/BaseRepository`, which fixes the minimum surface —
+`save`, `findById`, `existsById`, `count` — and stops there.
 `BaseRepository` deliberately does not extend `JpaRepository`. Nothing in
 Recurve deletes a record: an operator is deactivated, a plan and a price
 are deactivated, a subscriber is canceled. A repository that offers no
 `deleteAll` makes that a property of the type rather than of everyone's
-discipline. It also withholds the unbounded `findAll()`, since every
-listing is paginated (FR-07).
+discipline. It also offers no listing: every listing is paginated (FR-07)
+and served from the search index. A feature's JPA repository adds only
+what its use cases need — a lookup by a natural key, an existence check,
+a stream of everything for rebuilding the index.
 
-A feature's repository adds only what its use cases need — a lookup by a
-natural key, an existence check. Custom queries via `@Query` or a
-`Specification` in a dedicated class (`SubscriberSpecifications`). Never
-business logic; never calls an entity's business method.
+The search repository (`UserSearchRepository`) is a class over
+`ElasticsearchOperations` with the same narrow spirit: `save`, `saveAll`,
+`search`, `indexExists`, `recreateIndex`, `refresh`. No single-document
+delete; an index is only ever rebuilt whole. A dedicated class
+(`UserSearchQueries`) turns the feature's filter into a query, the way a
+`Specifications` class would. Never business logic; never calls an
+entity's business method.
+
+The index's settings and mapping live outside Java, in
+`src/main/resources/search/`, next to the schema in `db/migration`. They
+are applied by the feature's `UserIndexBootstrap` at startup, which
+creates a missing index and fills it from the database; an existing index
+is left alone, and a mapping change is a deliberate rebuild through the
+feature's reindex endpoint (`MANAGE_SYSTEM`).
 
 ### Application (`service/`)
 
@@ -173,14 +197,18 @@ business logic; never calls an entity's business method.
 Three-step pattern for every state-changing use case:
 
 ```
-1. repository.findById(id)      load      (skipped on creation)
-2. entity.businessMethod()      domain changes state, or throws
-3. repository.save(entity)      persist
+1. repository.findById(id)                    load      (skipped on creation)
+2. entity.businessMethod()                    domain changes state, or throws
+3. repository.save(entity)                    persist
+   searchRepository.save(Summary.of(entity))  index, same transaction
 ```
 
 `save()` is always explicit, even on updates. For a managed entity it is a
 no-op, but it keeps the intent visible without relying on dirty checking.
 If step 2 throws, step 3 does not run and the transaction rolls back.
+If indexing throws, the transaction rolls back too: the database and the
+index never diverge, and the caller gets a 503 rather than a listing that
+quietly stopped matching the data.
 
 Before step 2 the service also:
 
@@ -255,6 +283,8 @@ useless. Two components are internal on purpose, both running when there
 is no authenticated operator to check, and both talking to the repository
 rather than to the service:
 
+- `UserIndexBootstrap`, which creates the search index at startup and
+  calls the service's unchecked `reindexInternal()`.
 - `OperatorDetailsService`, which runs inside the authentication filter,
   before a principal exists.
 - `OperatorBootstrap`, which creates the first operator on an empty
@@ -317,6 +347,23 @@ public String charge(Subscriber subscriber, BigDecimal amount) {
 
 The service knows `PaymentGatewayException`, never `StripeException`.
 
+## Failure
+
+Fail-fast: the system prefers to stop and make noise over continuing
+inconsistently in silence. Indexing runs inside the write transaction, so
+a search node that is down fails the write with a rollback. A search index
+that cannot be created at startup prevents the application from starting.
+
+Exceptions per layer — each layer throws only its own and never swallows
+the layer below:
+
+| Layer | Throws | Catches |
+|---|---|---|
+| Domain | business exceptions extending the bases in `shared/domain/exception` | nothing |
+| Persistence | what Spring Data translates (`DataAccessException` and subclasses); no class of its own | nothing |
+| Application | nothing of its own; propagates domain and persistence | nothing — a `catch` in a service is a rule out of place |
+| Presentation | `InvalidRequestException` for the shape of the input | everything, in one place: `GlobalExceptionHandler` |
+
 ## Exceptions
 
 Abstract bases in `shared/domain/exception/`; concrete ones in
@@ -330,10 +377,12 @@ Abstract bases in `shared/domain/exception/`; concrete ones in
 | `MethodArgumentNotValidException` | Bean Validation | 400 | — |
 | `InvalidRequestException` | request shape Bean Validation cannot express | 400 | sort field outside the allowed list |
 | `AccessDeniedException` | missing permission | 403 | — |
+| `DataAccessResourceFailureException` | a store cannot be reached | 503 | search node down; fixed message, never the host |
 
 `GlobalExceptionHandler` maps by base type and responds with `ApiError`.
 An unauthenticated request never reaches a controller, so it is Spring
-Security — not the handler — that answers 401.
+Security — not the handler — that answers 401. Anything unmapped is a
+500 with no detail.
 
 ## Request flow
 
@@ -358,7 +407,7 @@ Every listing takes the same query parameters and answers with
 
 | Parameter | Default | Meaning |
 |---|---|---|
-| `q` | — | free text, case-insensitive substring, over the feature's searchable fields |
+| `q` | — | free text, case-insensitive, matching the start of any word of the feature's searchable fields; every word typed must match |
 | `filter` | — | repeatable, `field:value` or `field:value1,value2` |
 | `page` | `0` | zero-based page number |
 | `size` | `20` | page size, maximum 100 |
@@ -390,7 +439,7 @@ empty page reads as "nobody matches", which is a different and false
 answer.
 
 Adding a filter is a constant in that enum plus a case in the feature's
-specifications. The endpoint signature does not change. A `page`, `size`,
+search queries. The endpoint signature does not change. A `page`, `size`,
 `sort` or `filter` outside what is allowed is a 400, never a silent
 fallback to the default.
 
@@ -433,16 +482,28 @@ src/<test source set>/java/com/navesdev/recurve/
         └── SubscriberControllerTest.java
 ```
 
-Holds for any source set (`test`, integration, etc.). How source sets are
-split and what runs in each is a build decision, outside this document.
+Two source roots, so that the unit suite never needs a server:
 
-| Layer | Needs | Covers |
-|---|---|---|
-| Domain | nothing — plain JUnit | transition rules, invariants |
-| Application | Mockito; repository and other services mocked | orchestration, uniqueness, exceptions |
-| Presentation | `@WebMvcTest` with mocked service | request validation, serialization, HTTP status |
-| Persistence | real database | `Specification`, custom queries |
-| Authorization | Spring context + `@WithMockUser(authorities = ...)` | `@PreAuthorize` per use case |
+| Root | Names | Needs | Command |
+|---|---|---|---|
+| `src/test` | `*Test` | nothing | `./mvnw test` |
+| `src/testIntegration` | `*IT` | `docker compose up -d` (PostgreSQL, Elasticsearch) | `./mvnw verify` |
+
+`./mvnw verify -Pintegration` runs only the integration tests.
+
+| Layer | Root | Needs | Covers |
+|---|---|---|---|
+| Domain | test | nothing — plain JUnit | transition rules, invariants, the read model's projection |
+| Application | test | Mockito; repositories and other services mocked | orchestration, uniqueness, indexing on write, exceptions |
+| Presentation | test | `@WebMvcTest` with mocked service | request validation, serialization, HTTP status |
+| Query builder | test | nothing — the query is inspected as data | what a filter and page turn into |
+| JPA persistence | testIntegration | real database (`@DataJpaTest`) | lookups, custom queries |
+| Search persistence | testIntegration | real node (`@DataElasticsearchTest`) | the listing rules FR-06, FR-07 on the mapped index |
+| Authorization | testIntegration | `@SpringBootTest` + HTTP Basic | `@PreAuthorize` per use case |
+| Fail-fast | testIntegration | `@SpringBootTest`, search repository mocked to fail | the rollback the transaction promises |
+
+Integration tests use their own database (`recurve-test`) and their own
+index prefix (`test-`), configured in `src/testIntegration/resources`.
 
 A test that crosses layers (end-to-end endpoint) lives at the root of the
 feature package.
@@ -503,6 +564,19 @@ Tests point at their own database (`recurve-test`, created by
 database: a repository test clears tables, and rows left over from a
 manual run would collide with its fixtures. Each test still rolls back;
 the separate database is what makes that rollback enough.
+
+### Search index
+
+The operator index's settings (analyzers) and mapping live in
+`src/main/resources/search/users-settings.json` and `users-mapping.json`.
+`UserIndexBootstrap` creates a missing index from them at startup and
+fills it from the database. There is no versioning as with Flyway: a
+mapping change is a rebuild (`POST /api/users/reindex`), which recreates
+the index from the files and reindexes every operator.
+
+`spring.elasticsearch.uris` follows the same placeholder pattern as the
+datasource (`${ES_URL:http://localhost:9230}`). Integration tests share
+the node and keep apart through `recurve.search.index-prefix: test-`.
 
 ### Lombok
 

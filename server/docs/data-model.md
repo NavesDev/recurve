@@ -170,7 +170,13 @@ Deliberately not indexed:
   `plan_prices` by its PK, then sort the filtered result.
 - `users.active`: small table, low cardinality.
 
-Declaration: `@Index` on `@Table` in the entity while `ddl-auto: update`.
-Hibernate does not generate a partial index; that comes in via Flyway
-(NFR-08). Once Flyway exists, the migration is the source of truth and
-`@Index` goes away.
+Declaration: Flyway now exists (NFR-08), so the migrations under
+`server/src/main/resources/db/migration` are the source of truth for the
+schema — tables, FKs and indexes alike. The entity declares no `@Index`.
+`ddl-auto: validate` only checks that the mapping matches the schema the
+migrations produced; it never changes it.
+
+Migrations are versioned `V<n>__<description>.sql` and are immutable once
+merged: a correction is a new migration, never an edit of an applied one.
+Only `users` and `user_permissions` exist so far; the tables for `plan`,
+`subscriber` and `payment` come with their features.

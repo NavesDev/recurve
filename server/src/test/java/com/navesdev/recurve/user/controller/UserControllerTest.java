@@ -24,6 +24,7 @@ import org.springframework.boot.test.context.TestConfiguration;
 import org.springframework.boot.webmvc.test.autoconfigure.WebMvcTest;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Import;
+import org.springframework.dao.DataAccessResourceFailureException;
 import org.springframework.data.domain.PageImpl;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.http.MediaType;
@@ -290,6 +291,36 @@ class UserControllerTest {
 
     private static org.springframework.test.web.servlet.RequestBuilder register(String body) {
         return post("/api/users").contentType(MediaType.APPLICATION_JSON).content(body);
+    }
+
+    @Nested
+    @DisplayName("FR-01.5 the search index is rebuilt on request")
+    class Reindexing {
+
+        @Test
+        void theResponseSaysHowManyOperatorsWereIndexed() throws Exception {
+            when(service.reindex()).thenReturn(42L);
+
+            mvc.perform(post("/api/users/reindex"))
+                    .andExpect(status().isOk())
+                    .andExpect(jsonPath("$.indexed").value(42));
+        }
+    }
+
+    @Nested
+    @DisplayName("Fail-fast: a store that cannot be reached is reported, not hidden")
+    class StoreUnavailable {
+
+        @Test
+        void anUnreachableStoreIsAServiceUnavailableWithoutItsDetails() throws Exception {
+            when(service.search(any(UserFilter.class), any()))
+                    .thenThrow(new DataAccessResourceFailureException("connect to localhost:9230 refused"));
+
+            mvc.perform(get("/api/users"))
+                    .andExpect(status().isServiceUnavailable())
+                    .andExpect(jsonPath("$.status").value(503))
+                    .andExpect(jsonPath("$.message").value("A backing service is unavailable"));
+        }
     }
 
     private static User operator() {

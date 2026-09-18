@@ -75,8 +75,14 @@ public class UserController {
         return UserResponse.from(service.findById(id));
     }
 
+    /** FR-01.5: rebuilds the search index from the database. */
+    @PostMapping("/reindex")
+    public ReindexResponse reindex() {
+        return new ReindexResponse(service.reindex());
+    }
+
     /**
-     * FR-06.1 and FR-07. {@code q} searches name and email by substring,
+     * FR-06.1 and FR-07. {@code q} searches name and email by word prefix,
      * case-insensitively. {@code filter} is repeatable and written as
      * {@code field:value} or {@code field:value1,value2} — values of one
      * field combine with OR, separate filters with AND. {@code sort} names

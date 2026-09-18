@@ -77,6 +77,7 @@ class UserEndpointAuthorizationIT {
         register("Vera Viewer", "viewer@recurve.local", Set.of(Permission.VIEW_USERS), true);
         register("Otto Outsider", "outsider@recurve.local", Set.of(Permission.VIEW_PLANS), true);
         register("Rita Retired", "retired@recurve.local", Set.of(Permission.MANAGE_USERS), false);
+        register("Sam Sysadmin", "sysadmin@recurve.local", Set.of(Permission.MANAGE_SYSTEM), true);
         entityManager.flush();
     }
 
@@ -101,7 +102,7 @@ class UserEndpointAuthorizationIT {
     void manageImpliesViewSoAManagerMayList() throws Exception {
         mvc.perform(get("/api/users").with(basic("manager@recurve.local")))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.total").value(4));
+                .andExpect(jsonPath("$.total").value(5));
     }
 
     @Test
@@ -152,9 +153,27 @@ class UserEndpointAuthorizationIT {
                 .param("page", "0")
                 .param("size", "2"))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.total").value(3))
+                .andExpect(jsonPath("$.total").value(4))
                 .andExpect(jsonPath("$.items.length()").value(2))
                 .andExpect(jsonPath("$.items[0].email").value("viewer@recurve.local"));
+    }
+
+    @Nested
+    @DisplayName("FR-01.5 rebuilding the index is a system operation")
+    class Reindexing {
+
+        @Test
+        void managingOperatorsIsNotEnough() throws Exception {
+            mvc.perform(post("/api/users/reindex").with(basic("manager@recurve.local")))
+                    .andExpect(status().isForbidden());
+        }
+
+        @Test
+        void managingTheSystemRebuildsTheIndexFromTheDatabase() throws Exception {
+            mvc.perform(post("/api/users/reindex").with(basic("sysadmin@recurve.local")))
+                    .andExpect(status().isOk())
+                    .andExpect(jsonPath("$.indexed").value(5));
+        }
     }
 
     @Nested

@@ -3,6 +3,7 @@ package com.navesdev.recurve.shared.controller;
 import java.time.Clock;
 import java.util.List;
 
+import org.springframework.dao.DataAccessResourceFailureException;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.AccessDeniedException;
@@ -46,6 +47,15 @@ public class GlobalExceptionHandler {
     @ExceptionHandler(AccessDeniedException.class)
     public ResponseEntity<ApiError> handleAccessDenied(AccessDeniedException e) {
         return respond(HttpStatus.FORBIDDEN, "Access denied");
+    }
+
+    /**
+     * Fail-fast: a store that cannot be reached fails the request loudly.
+     * The message is fixed — the exception names hosts and ports.
+     */
+    @ExceptionHandler(DataAccessResourceFailureException.class)
+    public ResponseEntity<ApiError> handleStoreUnavailable(DataAccessResourceFailureException e) {
+        return respond(HttpStatus.SERVICE_UNAVAILABLE, "A backing service is unavailable");
     }
 
     @ExceptionHandler(MethodArgumentNotValidException.class)

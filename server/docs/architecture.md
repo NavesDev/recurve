@@ -53,6 +53,7 @@ Arrows only point downward.
 ```
 src/main/java/com/navesdev/recurve/
 ├── RecurveApplication.java
+├── shared/               # cross-cutting; imports no feature
 ├── user/
 ├── plan/
 ├── payment/
@@ -68,9 +69,21 @@ src/main/java/com/navesdev/recurve/
 Every feature follows the four subpackages. An extra subpackage only for
 external service adapters (`payment/gateway/`).
 
-Cross-cutting code (security config, global exception handler,
-pagination) **[open]**: location to be decided once the first feature
-exists.
+Cross-cutting code lives in `shared/`, laid out in the same layers as a
+feature so the dependency rule reads the same way:
+
+```
+shared/
+├── config/               # SecurityConfig, ClockConfig
+├── controller/           # GlobalExceptionHandler, ApiError, PageResponse
+└── domain/exception/     # the abstract exception bases
+```
+
+`shared/` is not a feature: it has no service and no repository, and it
+never imports a feature. Features import it, never the reverse. Anything
+that starts wanting business rules belongs in a feature instead.
+
+The schema lives outside Java, in `src/main/resources/db/migration`.
 
 ## Each layer in detail
 
@@ -219,6 +232,20 @@ Spring Security with method security enabled (`@EnableMethodSecurity`).
 - An inactive operator (BR-09) is blocked in `UserDetailsService`:
   `enabled=false`.
 
+Because the check lives in a proxy, a call that does not cross the proxy
+is not checked. That is what makes an unannotated internal component
+possible — and what makes an annotation on a self-invoked method silently
+useless. Two components are internal on purpose, both running when there
+is no authenticated operator to check, and both talking to the repository
+rather than to the service:
+
+- `OperatorDetailsService`, which runs inside the authentication filter,
+  before a principal exists.
+- `OperatorBootstrap`, which creates the first operator on an empty
+  table. Every write use case demands `MANAGE_USERS`, so without it no
+  operator could ever be created through the API. Its credentials come
+  from the environment and it does nothing when they are absent.
+
 The scheduled job (billing) runs without an operator. Mechanism to be
 decided with FR-04.1: a system `SecurityContext`, or a dedicated
 unannotated service method invoked only by the feature's own scheduler.
@@ -276,7 +303,7 @@ The service knows `PaymentGatewayException`, never `StripeException`.
 
 ## Exceptions
 
-Cross-cutting abstract bases **[open]** (see Layout); concrete ones in
+Abstract bases in `shared/domain/exception/`; concrete ones in
 `<feature>/domain/exception/`.
 
 | Base | Meaning | HTTP | Example |
@@ -285,9 +312,12 @@ Cross-cutting abstract bases **[open]** (see Layout); concrete ones in
 | `BusinessRuleException` | business rule violated | 422 | `EmailAlreadyInUseException`, `PaymentNotRefundableException` |
 | `ExternalServiceException` | external service failed | 502 | `PaymentGatewayException` |
 | `MethodArgumentNotValidException` | Bean Validation | 400 | — |
+| `InvalidRequestException` | request shape Bean Validation cannot express | 400 | sort field outside the allowed list |
 | `AccessDeniedException` | missing permission | 403 | — |
 
 `GlobalExceptionHandler` maps by base type and responds with `ApiError`.
+An unauthenticated request never reaches a controller, so it is Spring
+Security — not the handler — that answers 401.
 
 ## Request flow
 
@@ -304,6 +334,28 @@ Cross-cutting abstract bases **[open]** (see Layout); concrete ones in
 
 Errors propagate as exceptions and `GlobalExceptionHandler` translates
 them.
+
+## Listing contract
+
+Every listing takes the same query parameters and answers with
+`PageResponse<T>`, so a client learns the shape once (FR-06, FR-07).
+
+| Parameter | Default | Meaning |
+|---|---|---|
+| `q` | — | free text, case-insensitive substring, over the feature's searchable fields |
+| `page` | `0` | zero-based page number |
+| `size` | `20` | page size, maximum 100 |
+| `sort` | the feature's default | one field, from the feature's allow-list |
+| `direction` | `asc` | `asc` or `desc` |
+
+Each feature adds its own filters (`active` for operators, `status` for
+subscribers, and so on). A `page`, `size`, `sort` or `direction` outside
+what is allowed is a 400, never a silent fallback to the default.
+
+The allowed sort fields are an enum in the feature's `service/`, not a
+free string: the allow-list is part of the use case, and the controller
+only maps the incoming text onto it. Sorting always appends `id` as a
+secondary key so paging stays stable (FR-07.4).
 
 ## Tests
 
@@ -354,6 +406,24 @@ repository, only the local database default from `docker-compose.yaml`.
 
 `Clock` is an injectable bean; entities receive `Instant` as a parameter.
 Tests control time.
+
+### Schema
+
+Flyway owns the schema. Migrations are `V<n>__<description>.sql` under
+`src/main/resources/db/migration` and are immutable once merged: a
+correction is a new migration, never an edit of an applied one. Hibernate
+runs with `ddl-auto: validate`, so a mapping that drifts from the schema
+fails at startup instead of quietly altering a table.
+
+Boot 4 autoconfigures per technology, so the integration comes from
+`spring-boot-flyway`; `flyway-core` on its own would sit on the classpath
+unwired.
+
+### Lombok
+
+`@Getter` and `@RequiredArgsConstructor` only. No `@Setter` and no
+`@Data`: an entity changes state through a business method, and a
+generated setter would open a second door into the domain.
 
 ## Naming conventions
 

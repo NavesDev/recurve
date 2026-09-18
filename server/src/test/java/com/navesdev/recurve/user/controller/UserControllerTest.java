@@ -33,6 +33,7 @@ import org.springframework.test.web.servlet.MockMvc;
 import com.navesdev.recurve.shared.controller.GlobalExceptionHandler;
 import com.navesdev.recurve.user.domain.Permission;
 import com.navesdev.recurve.user.domain.User;
+import com.navesdev.recurve.user.domain.UserSummary;
 import com.navesdev.recurve.user.service.CreateUserCommand;
 import com.navesdev.recurve.user.service.UserFilter;
 import com.navesdev.recurve.user.service.UserService;
@@ -147,7 +148,7 @@ class UserControllerTest {
         @Test
         void thePageReportsItsItemsItsPositionAndTheTotal() throws Exception {
             when(service.search(any(UserFilter.class), any()))
-                    .thenReturn(new PageImpl<>(List.of(operator()), PageRequest.of(0, 20), 42));
+                    .thenReturn(new PageImpl<>(List.of(UserSummary.of(operator())), PageRequest.of(0, 20), 42));
 
             mvc.perform(get("/api/users"))
                     .andExpect(status().isOk())
@@ -224,7 +225,7 @@ class UserControllerTest {
         @Test
         void aFilterTheListingOffersIsAccepted() throws Exception {
             when(service.search(any(UserFilter.class), any()))
-                    .thenReturn(new PageImpl<>(List.of(operator()), PageRequest.of(0, 20), 1));
+                    .thenReturn(new PageImpl<>(List.of(UserSummary.of(operator())), PageRequest.of(0, 20), 1));
 
             mvc.perform(get("/api/users").param("filter", "active:true"))
                     .andExpect(status().isOk());

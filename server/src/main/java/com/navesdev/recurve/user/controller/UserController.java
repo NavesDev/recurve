@@ -26,6 +26,7 @@ import com.navesdev.recurve.shared.controller.PageResponse;
 import com.navesdev.recurve.shared.controller.RequestFilters;
 import com.navesdev.recurve.shared.controller.RequestSort;
 import com.navesdev.recurve.user.domain.User;
+import com.navesdev.recurve.user.domain.UserSummary;
 import com.navesdev.recurve.user.service.UserFilter;
 import com.navesdev.recurve.user.service.UserFilterField;
 import com.navesdev.recurve.user.service.UserService;
@@ -94,7 +95,7 @@ public class UserController {
         // Read straight off the request: binding to List<String> would let
         // Spring split on the comma, which is the separator inside a
         // criterion's own value (field:one,two).
-        Page<User> found = service.search(filterOf(q, request.getParameterValues("filter")), pageable);
+        Page<UserSummary> found = service.search(filterOf(q, request.getParameterValues("filter")), pageable);
 
         return PageResponse.from(found, UserResponse::from);
     }

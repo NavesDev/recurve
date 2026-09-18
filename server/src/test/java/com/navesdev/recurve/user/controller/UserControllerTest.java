@@ -41,7 +41,7 @@ import com.navesdev.recurve.user.service.UserService;
  * What the API promises a client: the shape of a page, what counts as a
  * bad request, and that a password never travels back out. Authorization
  * needs the real service, so it lives in
- * {@code UserEndpointAuthorizationTest}.
+ * {@code UserEndpointAuthorizationIT}.
  */
 @WebMvcTest(UserController.class)
 @Import({ GlobalExceptionHandler.class, UserControllerTest.FixedClock.class })

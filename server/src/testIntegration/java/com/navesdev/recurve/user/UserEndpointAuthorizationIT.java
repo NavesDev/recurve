@@ -42,7 +42,7 @@ import jakarta.persistence.PersistenceContext;
 @SpringBootTest
 @AutoConfigureMockMvc
 @Transactional
-class UserEndpointAuthorizationTest {
+class UserEndpointAuthorizationIT {
 
     private static final String PASSWORD = "s3cret-password";
     private static final Instant NOW = Instant.parse("2026-01-15T10:00:00Z");

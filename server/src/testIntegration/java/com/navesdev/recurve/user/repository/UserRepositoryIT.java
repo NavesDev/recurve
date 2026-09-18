@@ -34,7 +34,7 @@ import jakarta.persistence.PersistenceContext;
  */
 @DataJpaTest
 @AutoConfigureTestDatabase(replace = AutoConfigureTestDatabase.Replace.NONE)
-class UserRepositoryTest {
+class UserRepositoryIT {
 
     private static final Instant NOW = Instant.parse("2026-01-15T10:00:00Z");
 
@@ -111,9 +111,9 @@ class UserRepositoryTest {
 
         @BeforeEach
         void register() {
-            UserRepositoryTest.this.register("Ada Lovelace", "ada@recurve.local", Set.of());
-            UserRepositoryTest.this.register("Grace Hopper", "grace@recurve.local", Set.of());
-            UserRepositoryTest.this.register("Alan Turing", "alan@example.com", Set.of());
+            UserRepositoryIT.this.register("Ada Lovelace", "ada@recurve.local", Set.of());
+            UserRepositoryIT.this.register("Grace Hopper", "grace@recurve.local", Set.of());
+            UserRepositoryIT.this.register("Alan Turing", "alan@example.com", Set.of());
         }
 
         @Test

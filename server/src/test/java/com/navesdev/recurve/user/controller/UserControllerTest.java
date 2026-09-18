@@ -186,9 +186,20 @@ class UserControllerTest {
         }
 
         @Test
-        void aDirectionThatIsNeitherAscendingNorDescendingIsAValidationError() throws Exception {
-            mvc.perform(get("/api/users").param("direction", "sideways"))
+        void aDescendingSortOverAnAllowedFieldIsAccepted() throws Exception {
+            when(service.search(any(UserFilter.class), any()))
+                    .thenReturn(new PageImpl<>(List.of(), PageRequest.of(0, 20), 0));
+
+            mvc.perform(get("/api/users").param("sort", "-email"))
+                    .andExpect(status().isOk());
+        }
+
+        @Test
+        void aDescendingSortOverAForbiddenFieldIsStillAValidationError() throws Exception {
+            mvc.perform(get("/api/users").param("sort", "-passwordHash"))
                     .andExpect(status().isBadRequest());
+
+            verify(service, never()).search(any(), any());
         }
     }
 

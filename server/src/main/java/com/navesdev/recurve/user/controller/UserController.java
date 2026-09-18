@@ -24,6 +24,7 @@ import org.springframework.web.bind.annotation.RestController;
 import com.navesdev.recurve.shared.controller.InvalidRequestException;
 import com.navesdev.recurve.shared.controller.PageResponse;
 import com.navesdev.recurve.shared.controller.RequestFilters;
+import com.navesdev.recurve.shared.controller.RequestSort;
 import com.navesdev.recurve.user.domain.User;
 import com.navesdev.recurve.user.service.UserFilter;
 import com.navesdev.recurve.user.service.UserFilterField;
@@ -77,8 +78,9 @@ public class UserController {
      * FR-06.1 and FR-07. {@code q} searches name and email by substring,
      * case-insensitively. {@code filter} is repeatable and written as
      * {@code field:value} or {@code field:value1,value2} — values of one
-     * field combine with OR, separate filters with AND. {@code sort} is
-     * limited to the allowed fields and defaults to name ascending.
+     * field combine with OR, separate filters with AND. {@code sort} names
+     * one allowed field, prefixed with {@code -} for descending, and
+     * defaults to name ascending.
      */
     @GetMapping
     public PageResponse<UserResponse> search(
@@ -86,10 +88,9 @@ public class UserController {
             HttpServletRequest request,
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "20") int size,
-            @RequestParam(required = false) String sort,
-            @RequestParam(defaultValue = "asc") String direction) {
+            @RequestParam(required = false) String sort) {
 
-        Pageable pageable = PageRequest.of(validPage(page), validSize(size), sortOf(sort, direction));
+        Pageable pageable = PageRequest.of(validPage(page), validSize(size), sortOf(sort));
         // Read straight off the request: binding to List<String> would let
         // Spring split on the comma, which is the separator inside a
         // criterion's own value (field:one,two).
@@ -135,20 +136,18 @@ public class UserController {
         return size;
     }
 
-    private static Sort sortOf(String sort, String direction) {
-        UserSortField field = sort == null || sort.isBlank()
-                ? UserSortField.defaultField()
-                : UserSortField.from(sort).orElseThrow(() -> new InvalidRequestException(
-                        "sort must be one of: " + UserSortField.allowed()));
+    private static Sort sortOf(String sort) {
+        RequestSort requested = RequestSort.parse(sort, UserSortField.defaultField().property());
 
-        Sort.Direction way = switch (direction.toLowerCase()) {
-            case "asc" -> Sort.Direction.ASC;
-            case "desc" -> Sort.Direction.DESC;
-            default -> throw new InvalidRequestException("direction must be asc or desc");
-        };
+        UserSortField field = UserSortField.from(requested.field())
+                .orElseThrow(() -> new InvalidRequestException(
+                        "sort must be one of: " + UserSortField.allowed()
+                                + ", optionally prefixed with - for descending"));
 
         // FR-07.4: a fixed secondary key keeps the ordering stable, so an
-        // operator never repeats or vanishes between pages.
-        return Sort.by(way, field.property()).and(Sort.by(Sort.Direction.ASC, "id"));
+        // operator never repeats or vanishes between pages. It stays
+        // ascending whichever way the caller asked for: it is there to keep
+        // pages from overlapping, not to follow the request.
+        return Sort.by(requested.direction(), field.property()).and(Sort.by(Sort.Direction.ASC, "id"));
     }
 }

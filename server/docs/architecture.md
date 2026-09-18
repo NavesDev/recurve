@@ -362,11 +362,10 @@ Every listing takes the same query parameters and answers with
 | `filter` | — | repeatable, `field:value` or `field:value1,value2` |
 | `page` | `0` | zero-based page number |
 | `size` | `20` | page size, maximum 100 |
-| `sort` | the feature's default | one field, from the feature's allow-list |
-| `direction` | `asc` | `asc` or `desc` |
+| `sort` | the feature's default, ascending | one field from the feature's allow-list, prefixed with `-` for descending |
 
 ```
-?q=ada&filter=active:true&sort=email&direction=desc&page=0&size=20
+?q=ada&filter=active:true&sort=-email&page=0&size=20
 ?filter=status:ACTIVE,PAST_DUE&filter=plan=<id>
 ```
 
@@ -392,9 +391,20 @@ answer.
 
 Adding a filter is a constant in that enum plus a case in the feature's
 specifications. The endpoint signature does not change. A `page`, `size`,
-`sort`, `direction` or `filter` outside what is allowed is a 400, never a
-silent fallback to the default. Sorting always appends `id` as a
-secondary key so paging stays stable (FR-07.4).
+`sort` or `filter` outside what is allowed is a 400, never a silent
+fallback to the default.
+
+The direction rides with the field, as JSON:API, Spring Data, OData and
+Elasticsearch each do in their own spelling, rather than travelling in a
+parameter of its own. A separate direction cannot say what it means once
+more than one field is sorted on — `sort=name&sort=createdAt&
+direction=desc` names no answer — so keeping them together leaves
+multi-field sorting open instead of closing it.
+
+Sorting always appends `id` as a secondary key so paging stays stable
+(FR-07.4). That key is ascending whichever way the caller asked: it is
+there to keep pages from overlapping, not to follow the request, so two
+directions over a fully tied field return the same order.
 
 ## Tests
 

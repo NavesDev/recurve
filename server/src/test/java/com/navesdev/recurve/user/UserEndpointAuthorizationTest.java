@@ -140,8 +140,7 @@ class UserEndpointAuthorizationTest {
                 .with(basic("manager@recurve.local"))
                 .param("q", "recurve.local")
                 .param("filter", "active:true")
-                .param("sort", "email")
-                .param("direction", "desc")
+                .param("sort", "-email")
                 .param("page", "0")
                 .param("size", "2"))
                 .andExpect(status().isOk())
@@ -155,39 +154,39 @@ class UserEndpointAuthorizationTest {
     class Ordering {
 
         @Test
-        void theDirectionDecidesWhichEndOfTheFieldComesFirst() throws Exception {
-            List<String> ascending = emailsSortedBy("email", "asc");
-            List<String> descending = emailsSortedBy("email", "desc");
+        void aMinusBeforeTheFieldTurnsTheOrderAround() throws Exception {
+            List<String> ascending = emailsSortedBy("email");
+            List<String> descending = emailsSortedBy("-email");
 
             assertThat(ascending).isSorted();
             assertThat(descending).containsExactlyElementsOf(ascending.reversed());
         }
 
         @Test
-        void theDirectionAppliesToWhicheverFieldWasChosen() throws Exception {
-            assertThat(emailsSortedBy("name", "asc"))
-                    .isNotEqualTo(emailsSortedBy("name", "desc"));
+        void theOrderAppliesToWhicheverFieldWasChosen() throws Exception {
+            assertThat(emailsSortedBy("name")).isNotEqualTo(emailsSortedBy("-name"));
         }
 
         @Test
-        void aListingWithNoDirectionAsksForAscending() throws Exception {
-            assertThat(emailsSortedBy("email", null))
-                    .containsExactlyElementsOf(emailsSortedBy("email", "asc"));
+        void aFieldWithNoMinusComesBackAscending() throws Exception {
+            assertThat(emailsSortedBy("email")).isSorted();
         }
 
         @Test
         void aListingWithNoSortComesBackByNameAscending() throws Exception {
-            assertThat(emailsSortedBy(null, null))
-                    .containsExactlyElementsOf(emailsSortedBy("name", "asc"));
+            assertThat(emailsSortedBy(null)).containsExactlyElementsOf(emailsSortedBy("name"));
         }
 
-        private List<String> emailsSortedBy(String sort, String direction) throws Exception {
+        @Test
+        void aMinusWithNoFieldIsAValidationError() throws Exception {
+            mvc.perform(get("/api/users").with(basic("manager@recurve.local")).param("sort", "-"))
+                    .andExpect(status().isBadRequest());
+        }
+
+        private List<String> emailsSortedBy(String sort) throws Exception {
             var request = get("/api/users").with(basic("manager@recurve.local"));
             if (sort != null) {
                 request = request.param("sort", sort);
-            }
-            if (direction != null) {
-                request = request.param("direction", direction);
             }
 
             String json = mvc.perform(request)

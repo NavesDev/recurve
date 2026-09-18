@@ -15,7 +15,7 @@ Spec: `docs/superpowers/specs/2026-09-18-elasticsearch-search-design.md`.
 - All paths below are relative to `server/` unless they start with `docs/` or are `docker-compose.yaml` (repo root).
 - Layer rule (`server/docs/architecture.md`): Presentation imports Application + Domain only; Application imports Domain + Persistence; Persistence imports Domain; `shared/` never imports a feature.
 - Commit messages follow the branch convention `type(server-user): message` and end with `Co-Authored-By: Claude Opus 5 <noreply@anthropic.com>`. Commit with `GIT_AUTHOR_NAME=Claude GIT_AUTHOR_EMAIL=noreply@anthropic.com GIT_COMMITTER_NAME=Claude GIT_COMMITTER_EMAIL=noreply@anthropic.com` exported (the repo has no configured identity; earlier commits use this author).
-- Unit tests live in `src/test` and never need a server. Integration tests live in `src/testIntegration`, are named `*IT`, and need `docker compose up -d` (PostgreSQL on 54330, Elasticsearch on 92001).
+- Unit tests live in `src/test` and never need a server. Integration tests live in `src/testIntegration`, are named `*IT`, and need `docker compose up -d` (PostgreSQL on 54330, Elasticsearch on 9230).
 - Maven: `./mvnw test` = unit only. `./mvnw verify` = unit + integration. `./mvnw verify -Pintegration` = integration only.
 - Test names read as rules (existing style): `@Nested` classes with a `@DisplayName` naming the requirement (`FR-06 ...`), methods in the form `theSearchMatchesPartOfAName`.
 - Javadoc explains *why* (requirement ids, the rule being protected), in the density of the surrounding code.
@@ -74,7 +74,7 @@ Spec: `docs/superpowers/specs/2026-09-18-elasticsearch-search-design.md`.
 - Modify: `src/main/resources/application.yaml`
 
 **Interfaces:**
-- Produces: ES reachable at `http://localhost:92001`; property `spring.elasticsearch.uris`; property `recurve.search.index-prefix` (default empty).
+- Produces: ES reachable at `http://localhost:9230`; property `spring.elasticsearch.uris`; property `recurve.search.index-prefix` (default empty).
 
 - [ ] **Step 1: Add the service to docker-compose**
 
@@ -110,7 +110,7 @@ services:
       xpack.security.enabled: "false"
       ES_JAVA_OPTS: -Xms512m -Xmx512m
     ports:
-      - "92001:9200"
+      - "9230:9200"
     volumes:
       - elasticsearch_data:/usr/share/elasticsearch/data
 
@@ -121,7 +121,7 @@ volumes:
 
 - [ ] **Step 2: Start it and check it answers**
 
-Run: `docker compose -f /home/naves/Projetos/Recurve/docker-compose.yaml up -d && sleep 20 && curl -s localhost:92001 | grep number`
+Run: `docker compose -f /home/naves/Projetos/Recurve/docker-compose.yaml up -d && sleep 20 && curl -s localhost:9230 | grep number`
 Expected: a line like `"number" : "9.4.7",`
 
 - [ ] **Step 3: Add the starter to pom.xml**
@@ -143,7 +143,7 @@ In `src/main/resources/application.yaml`, under `spring:` add (after `datasource
 
 ```yaml
   elasticsearch:
-    uris: ${ES_URL:http://localhost:92001}
+    uris: ${ES_URL:http://localhost:9230}
 ```
 
 and under `recurve:` add:
@@ -292,7 +292,7 @@ spring:
     username: ${DB_USER:postgres}
     password: ${DB_PASSWORD:postgres}
   elasticsearch:
-    uris: ${TEST_ES_URL:http://localhost:92001}
+    uris: ${TEST_ES_URL:http://localhost:9230}
   flyway:
     enabled: true
     clean-disabled: false
@@ -1330,7 +1330,7 @@ If `@Id` on a record component is not picked up (an error mentioning "no id prop
 
 - [ ] **Step 5: Confirm the test index name**
 
-Run: `curl -s 'localhost:92001/_cat/indices?v' | grep users`
+Run: `curl -s 'localhost:9230/_cat/indices?v' | grep users`
 Expected: a `test-users` index; no `users` index yet.
 
 - [ ] **Step 6: Commit**
@@ -1926,7 +1926,7 @@ In `UserControllerTest.java`, add the import `org.springframework.dao.DataAccess
         @Test
         void anUnreachableStoreIsAServiceUnavailableWithoutItsDetails() throws Exception {
             when(service.search(any(UserFilter.class), any()))
-                    .thenThrow(new DataAccessResourceFailureException("connect to localhost:92001 refused"));
+                    .thenThrow(new DataAccessResourceFailureException("connect to localhost:9230 refused"));
 
             mvc.perform(get("/api/users"))
                     .andExpect(status().isServiceUnavailable())
@@ -2426,7 +2426,7 @@ Note: `UserServiceIT` boots a context with the search repository mocked, so `Use
 
 - [ ] **Step 8: Boot the real application once**
 
-Run: `cd /home/naves/Projetos/Recurve/server && curl -s -X DELETE localhost:92001/users >/dev/null; timeout 60 ./mvnw -q spring-boot:run 2>&1 | grep -m1 "Operator search index created"; curl -s 'localhost:92001/_cat/indices?v' | grep -w users`
+Run: `cd /home/naves/Projetos/Recurve/server && curl -s -X DELETE localhost:9230/users >/dev/null; timeout 60 ./mvnw -q spring-boot:run 2>&1 | grep -m1 "Operator search index created"; curl -s 'localhost:9230/_cat/indices?v' | grep -w users`
 Expected: the log line `Operator search index created and populated with N operators`, and a `users` index listed.
 
 - [ ] **Step 9: Commit**
@@ -2613,7 +2613,7 @@ Append to `README.md`:
 ## Running
 
 ```bash
-docker compose up -d          # PostgreSQL (54330) and Elasticsearch (92001)
+docker compose up -d          # PostgreSQL (54330) and Elasticsearch (9230)
 cd server
 ./mvnw test                   # unit tests, no server needed
 ./mvnw verify                 # unit + integration tests

@@ -44,7 +44,7 @@ service knows there are two stores.
 
 `docker-compose.yaml` adds `elasticsearch`: image 9.x (minor pinned to the
 client version managed by the Boot 4.1.1 BOM), `discovery.type=single-node`,
-`xpack.security.enabled=false`, 512m heap, port `92001:9200`, volume
+`xpack.security.enabled=false`, 512m heap, port `9230:9200`, volume
 `elasticsearch_data`.
 
 `pom.xml` adds `spring-boot-starter-data-elasticsearch`,
@@ -65,7 +65,7 @@ Existing tests that need infrastructure move and are renamed:
 `RecurveApplicationIT`. `src/test/resources/application.yaml` moves to
 `src/testIntegration/resources`. `src/test` has no yaml.
 
-Configuration: `spring.elasticsearch.uris: ${ES_URL:http://localhost:92001}`
+Configuration: `spring.elasticsearch.uris: ${ES_URL:http://localhost:9230}`
 in main. `recurve.search.index-prefix` (default empty; `test-` in
 testIntegration) so ITs use `test-users` and never touch `users`.
 

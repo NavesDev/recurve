@@ -46,6 +46,12 @@
 			<groupId>org.springframework.boot</groupId>
 			<artifactId>spring-boot-starter-security</artifactId>
 		</dependency>
+		<!-- The listing engine (FR-06, FR-07): search, filter, sort and
+		     pagination run here, not in PostgreSQL. -->
+		<dependency>
+			<groupId>org.springframework.boot</groupId>
+			<artifactId>spring-boot-starter-data-elasticsearch</artifactId>
+		</dependency>
 
 		<!-- Boot 4 ships autoconfiguration per technology; flyway-core on its
 		     own would be on the classpath but never wired. -->

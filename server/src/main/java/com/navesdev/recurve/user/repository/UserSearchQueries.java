@@ -6,6 +6,7 @@ import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Sort;
 import org.springframework.data.elasticsearch.client.elc.NativeQuery;
+import org.springframework.data.elasticsearch.client.elc.NativeQueryBuilder;
 
 import com.navesdev.recurve.user.service.UserFilter;
 import com.navesdev.recurve.user.service.UserFilterField;
@@ -50,13 +51,18 @@ public final class UserSearchQueries {
             }
         }
 
-        return NativeQuery.builder()
-                .withQuery(Query.of(query -> query.bool(bool.build())))
-                .withSort(sortOf(pageable.getSort()))
+        NativeQueryBuilder query = NativeQuery.builder()
+                .withQuery(Query.of(q -> q.bool(bool.build())))
                 // Page number and size only: the sort travels as sort options
-                // above, and a sorted Pageable would apply it a second time.
-                .withPageable(PageRequest.of(pageable.getPageNumber(), pageable.getPageSize()))
-                .build();
+                // below, and a sorted Pageable would apply it a second time.
+                .withPageable(PageRequest.of(pageable.getPageNumber(), pageable.getPageSize()));
+
+        // The builder rejects an empty list; an unsorted page is simply unsorted.
+        if (pageable.getSort().isSorted()) {
+            query.withSort(sortOf(pageable.getSort()));
+        }
+
+        return query.build();
     }
 
     private static Query matchesText(String text) {

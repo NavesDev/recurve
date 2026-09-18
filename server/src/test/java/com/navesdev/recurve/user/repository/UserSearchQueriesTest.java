@@ -118,6 +118,13 @@ class UserSearchQueriesTest {
         }
 
         @Test
+        void anUnsortedPageAsksForNoSortAndIsStillAValidQuery() {
+            NativeQuery query = UserSearchQueries.from(UserFilter.of(null), PageRequest.of(0, 10));
+
+            assertThat(query.getSortOptions()).isEmpty();
+        }
+
+        @Test
         void thePageIsCarriedWithoutItsSortSoItIsNotAppliedTwice() {
             NativeQuery query = UserSearchQueries.from(UserFilter.of(null), PageRequest.of(3, 10, Sort.by("name")));
 

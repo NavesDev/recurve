@@ -6,13 +6,16 @@ import java.util.EnumSet;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.ApplicationArguments;
 import org.springframework.boot.ApplicationRunner;
+import org.springframework.core.annotation.Order;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
 
 import com.navesdev.recurve.user.domain.Permission;
 import com.navesdev.recurve.user.domain.User;
+import com.navesdev.recurve.user.domain.UserSummary;
 import com.navesdev.recurve.user.repository.UserRepository;
+import com.navesdev.recurve.user.repository.UserSearchRepository;
 
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -29,12 +32,19 @@ import lombok.extern.slf4j.Slf4j;
  * startup with no authenticated operator, so it talks to the repository
  * rather than to {@link UserService}.
  */
+/*
+ * After UserIndexBootstrap (1): the index must exist with its mapping
+ * before anything is written to it, or Elasticsearch would create it on
+ * the fly with a mapping of its own guessing.
+ */
 @Component
+@Order(2)
 @RequiredArgsConstructor
 @Slf4j
 public class OperatorBootstrap implements ApplicationRunner {
 
     private final UserRepository repository;
+    private final UserSearchRepository searchRepository;
     private final PasswordEncoder passwordEncoder;
     private final Clock clock;
 
@@ -63,7 +73,7 @@ public class OperatorBootstrap implements ApplicationRunner {
                 EnumSet.allOf(Permission.class),
                 clock.instant());
 
-        repository.save(admin);
+        searchRepository.save(UserSummary.of(repository.save(admin)));
         log.info("Bootstrap operator created with email {}", admin.getEmail());
     }
 }

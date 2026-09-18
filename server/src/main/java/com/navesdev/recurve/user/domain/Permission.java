@@ -3,9 +3,11 @@ package com.navesdev.recurve.user.domain;
 import java.util.Set;
 
 /**
- * Granular access, one read and one write permission per resource (BR-01).
- * Access is not modelled as a role: an operator holds exactly the
- * permissions granted to them.
+ * Granular access. Most permissions come in pairs, one read and one write
+ * per resource (BR-01); {@link #MANAGE_SYSTEM} stands alone, an
+ * administrative operation with no read counterpart. Access is not
+ * modelled as a role: an operator holds exactly the permissions granted
+ * to them.
  */
 public enum Permission {
 
@@ -16,7 +18,9 @@ public enum Permission {
     VIEW_SUBSCRIBERS,
     MANAGE_SUBSCRIBERS,
     VIEW_PAYMENTS,
-    MANAGE_PAYMENTS;
+    MANAGE_PAYMENTS,
+    /** Operational routines with no resource of their own: rebuilding a search index. */
+    MANAGE_SYSTEM;
 
     /**
      * BR-01: manage implies view. Expanding here — once, while building the

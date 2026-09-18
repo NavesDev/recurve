@@ -23,6 +23,8 @@ names here are business terms, not code identifiers.
 - FR-01.3 Deactivate an operator without deleting. Inactive operator cannot
   sign in.
 - FR-01.4 List operators and their permissions (see FR-06.1).
+- FR-01.5 Rebuild the operator search index (see FR-06). Requires the
+  `MANAGE_SYSTEM` permission.
 
 ### FR-02 Plans
 
@@ -131,7 +133,8 @@ Offset-based.
 
 - BR-01 Permissions per resource: a view permission and a manage
   permission for each of operators, plans, subscribers and payments.
-  Manage implies view.
+  Manage implies view. One more permission, `MANAGE_SYSTEM`, covers
+  operational routines (rebuilding a search index) and implies nothing.
 - BR-02 Operator email is unique. Subscriber email is unique.
 - BR-03 A plan has no price of its own; amount and cycle live in the
   price. A plan may have several active prices, at most one per

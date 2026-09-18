@@ -394,6 +394,13 @@ specifications. The endpoint signature does not change. A `page`, `size`,
 `sort` or `filter` outside what is allowed is a 400, never a silent
 fallback to the default.
 
+A listing sorts on **one** field. Naming more than one — `sort=name,email`
+or a repeated `sort` — is a 400, not a silent choice of the first: quietly
+dropping the rest would answer a question the caller did not ask, and
+nothing in the response would say so. The syntax leaves room for several
+fields if a requirement ever asks for them; the allow-list is what would
+have to change, not the parameter.
+
 The direction rides with the field, as JSON:API, Spring Data, OData and
 Elasticsearch each do in their own spelling, rather than travelling in a
 parameter of its own. A separate direction cannot say what it means once

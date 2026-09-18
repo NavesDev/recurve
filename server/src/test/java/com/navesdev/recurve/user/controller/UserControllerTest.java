@@ -195,6 +195,20 @@ class UserControllerTest {
         }
 
         @Test
+        void namingMoreThanOneFieldIsAValidationErrorNotASilentChoiceOfOne() throws Exception {
+            // A listing sorts on one field (FR-06). Quietly honouring the
+            // first and dropping the rest would answer a question nobody
+            // asked, and the caller would never learn it happened.
+            mvc.perform(get("/api/users").param("sort", "name,email"))
+                    .andExpect(status().isBadRequest());
+
+            mvc.perform(get("/api/users").param("sort", "name").param("sort", "email"))
+                    .andExpect(status().isBadRequest());
+
+            verify(service, never()).search(any(), any());
+        }
+
+        @Test
         void aDescendingSortOverAForbiddenFieldIsStillAValidationError() throws Exception {
             mvc.perform(get("/api/users").param("sort", "-passwordHash"))
                     .andExpect(status().isBadRequest());

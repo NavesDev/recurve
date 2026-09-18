@@ -192,6 +192,76 @@ class UserControllerTest {
         }
     }
 
+    @Nested
+    @DisplayName("FR-06 filtering a listing")
+    class Filtering {
+
+        @Test
+        void aFilterTheListingOffersIsAccepted() throws Exception {
+            when(service.search(any(UserFilter.class), any()))
+                    .thenReturn(new PageImpl<>(List.of(operator()), PageRequest.of(0, 20), 1));
+
+            mvc.perform(get("/api/users").param("filter", "active:true"))
+                    .andExpect(status().isOk());
+        }
+
+        @Test
+        void severalValuesOfOneFieldTravelTogetherInOneFilter() throws Exception {
+            // A comma separates values inside one criterion; it must not be
+            // mistaken for a separator between criteria.
+            org.mockito.ArgumentCaptor<UserFilter> sent =
+                    org.mockito.ArgumentCaptor.forClass(UserFilter.class);
+            when(service.search(any(UserFilter.class), any()))
+                    .thenReturn(new PageImpl<>(List.of(), PageRequest.of(0, 20), 0));
+
+            mvc.perform(get("/api/users").param("filter", "active:true,false"))
+                    .andExpect(status().isOk());
+
+            verify(service).search(sent.capture(), any());
+            org.assertj.core.api.Assertions
+                    .assertThat(sent.getValue().valuesOf(
+                            com.navesdev.recurve.user.service.UserFilterField.ACTIVE))
+                    .containsExactly("true", "false");
+        }
+
+        @Test
+        void severalFiltersAreAcceptedInOneRequest() throws Exception {
+            when(service.search(any(UserFilter.class), any()))
+                    .thenReturn(new PageImpl<>(List.of(), PageRequest.of(0, 20), 0));
+
+            mvc.perform(get("/api/users")
+                    .param("filter", "active:true")
+                    .param("filter", "active:false"))
+                    .andExpect(status().isOk());
+        }
+
+        @Test
+        void aFieldTheListingDoesNotOfferIsAValidationErrorNotAnEmptyPage() throws Exception {
+            mvc.perform(get("/api/users").param("filter", "passwordHash:$2a$10$x"))
+                    .andExpect(status().isBadRequest())
+                    .andExpect(jsonPath("$.message").value(
+                            org.hamcrest.Matchers.containsString("filter must be one of")));
+
+            verify(service, never()).search(any(), any());
+        }
+
+        @Test
+        void aValueTheFieldCannotMeanIsAValidationError() throws Exception {
+            mvc.perform(get("/api/users").param("filter", "active:maybe"))
+                    .andExpect(status().isBadRequest());
+
+            verify(service, never()).search(any(), any());
+        }
+
+        @Test
+        void aFilterThatIsNotWrittenAsFieldValueIsAValidationError() throws Exception {
+            mvc.perform(get("/api/users").param("filter", "active"))
+                    .andExpect(status().isBadRequest());
+
+            verify(service, never()).search(any(), any());
+        }
+    }
+
     private static org.springframework.test.web.servlet.RequestBuilder register(String body) {
         return post("/api/users").contentType(MediaType.APPLICATION_JSON).content(body);
     }

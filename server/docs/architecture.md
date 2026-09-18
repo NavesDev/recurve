@@ -359,18 +359,41 @@ Every listing takes the same query parameters and answers with
 | Parameter | Default | Meaning |
 |---|---|---|
 | `q` | — | free text, case-insensitive substring, over the feature's searchable fields |
+| `filter` | — | repeatable, `field:value` or `field:value1,value2` |
 | `page` | `0` | zero-based page number |
 | `size` | `20` | page size, maximum 100 |
 | `sort` | the feature's default | one field, from the feature's allow-list |
 | `direction` | `asc` | `asc` or `desc` |
 
-Each feature adds its own filters (`active` for operators, `status` for
-subscribers, and so on). A `page`, `size`, `sort` or `direction` outside
-what is allowed is a 400, never a silent fallback to the default.
+```
+?q=ada&filter=active:true&sort=email&direction=desc&page=0&size=20
+?filter=status:ACTIVE,PAST_DUE&filter=plan=<id>
+```
 
-The allowed sort fields are an enum in the feature's `service/`, not a
-free string: the allow-list is part of the use case, and the controller
-only maps the incoming text onto it. Sorting always appends `id` as a
+Filtering is **one repeatable parameter, not one parameter per field**.
+Otherwise every requirement that adds a filter adds a query parameter and
+a controller argument, and the listing signature grows without bound —
+FR-06.2 alone wants billing cycle, FR-06.3 wants status and plan.
+
+The semantics are exactly FR-06 and no more: values of one field combine
+with OR, separate filters with AND. It is deliberately **not** an
+expression language (RSQL and the like). A grammar with parentheses,
+negation and OR across fields is a public surface nobody specified, it
+ties the API to the persistence model, and it makes a good error message
+hard to produce.
+
+Both `filter` and `sort` name their fields against an **allow-list**, an
+enum in the feature's `service/`. The allow-list is part of the use case,
+not of the controller, and without it a client could filter or sort over
+any mapped column — `passwordHash` included — and turn the listing into
+an oracle. A field outside the list is a 400, never an empty page: an
+empty page reads as "nobody matches", which is a different and false
+answer.
+
+Adding a filter is a constant in that enum plus a case in the feature's
+specifications. The endpoint signature does not change. A `page`, `size`,
+`sort`, `direction` or `filter` outside what is allowed is a 400, never a
+silent fallback to the default. Sorting always appends `id` as a
 secondary key so paging stays stable (FR-07.4).
 
 ## Tests

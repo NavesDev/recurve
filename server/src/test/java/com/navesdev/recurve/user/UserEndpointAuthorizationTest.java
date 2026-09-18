@@ -130,7 +130,7 @@ class UserEndpointAuthorizationTest {
         mvc.perform(get("/api/users")
                 .with(basic("manager@recurve.local"))
                 .param("q", "recurve.local")
-                .param("active", "true")
+                .param("filter", "active:true")
                 .param("sort", "email")
                 .param("direction", "desc")
                 .param("page", "0")

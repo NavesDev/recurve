@@ -1,6 +1,9 @@
 package com.navesdev.recurve.user.controller;
 
 import java.net.URI;
+import java.util.EnumMap;
+import java.util.List;
+import java.util.Map;
 import java.util.UUID;
 
 import org.springframework.data.domain.Page;
@@ -20,11 +23,14 @@ import org.springframework.web.bind.annotation.RestController;
 
 import com.navesdev.recurve.shared.controller.InvalidRequestException;
 import com.navesdev.recurve.shared.controller.PageResponse;
+import com.navesdev.recurve.shared.controller.RequestFilters;
 import com.navesdev.recurve.user.domain.User;
 import com.navesdev.recurve.user.service.UserFilter;
+import com.navesdev.recurve.user.service.UserFilterField;
 import com.navesdev.recurve.user.service.UserService;
 import com.navesdev.recurve.user.service.UserSortField;
 
+import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 
@@ -69,22 +75,50 @@ public class UserController {
 
     /**
      * FR-06.1 and FR-07. {@code q} searches name and email by substring,
-     * case-insensitively; {@code active} filters; {@code sort} is limited
-     * to the allowed fields and defaults to name ascending.
+     * case-insensitively. {@code filter} is repeatable and written as
+     * {@code field:value} or {@code field:value1,value2} — values of one
+     * field combine with OR, separate filters with AND. {@code sort} is
+     * limited to the allowed fields and defaults to name ascending.
      */
     @GetMapping
     public PageResponse<UserResponse> search(
             @RequestParam(required = false) String q,
-            @RequestParam(required = false) Boolean active,
+            HttpServletRequest request,
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "20") int size,
             @RequestParam(required = false) String sort,
             @RequestParam(defaultValue = "asc") String direction) {
 
         Pageable pageable = PageRequest.of(validPage(page), validSize(size), sortOf(sort, direction));
-        Page<User> found = service.search(new UserFilter(q, active), pageable);
+        // Read straight off the request: binding to List<String> would let
+        // Spring split on the comma, which is the separator inside a
+        // criterion's own value (field:one,two).
+        Page<User> found = service.search(filterOf(q, request.getParameterValues("filter")), pageable);
 
         return PageResponse.from(found, UserResponse::from);
+    }
+
+    /**
+     * Maps the repeatable filter parameter onto the use case's allow-list.
+     * A field the listing does not offer is a validation error, not an
+     * empty result — a silent empty page would read as "nobody matches".
+     */
+    private static UserFilter filterOf(String text, String[] filters) {
+        Map<UserFilterField, List<String>> criteria = new EnumMap<>(UserFilterField.class);
+
+        RequestFilters.parse(filters == null ? List.of() : List.of(filters)).forEach((field, values) -> {
+            UserFilterField allowed = UserFilterField.from(field)
+                    .orElseThrow(() -> new InvalidRequestException(
+                            "filter must be one of: " + UserFilterField.allowed()));
+            try {
+                allowed.validate(values);
+            } catch (IllegalArgumentException e) {
+                throw new InvalidRequestException(e.getMessage());
+            }
+            criteria.put(allowed, values);
+        });
+
+        return new UserFilter(text, criteria);
     }
 
     private static int validPage(int page) {

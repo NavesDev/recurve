@@ -5,6 +5,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
 
@@ -18,10 +19,11 @@ import org.springframework.boot.jdbc.test.autoconfigure.AutoConfigureTestDatabas
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Sort;
-import org.springframework.data.jpa.domain.Specification;
 
 import com.navesdev.recurve.user.domain.Permission;
 import com.navesdev.recurve.user.domain.User;
+import com.navesdev.recurve.user.service.UserFilter;
+import com.navesdev.recurve.user.service.UserFilterField;
 
 import jakarta.persistence.EntityManager;
 import jakarta.persistence.PersistenceContext;
@@ -116,56 +118,62 @@ class UserRepositoryTest {
 
         @Test
         void theSearchMatchesPartOfAName() {
-            assertThat(names(search(UserSpecifications.matchesText("Lovelace"))))
+            assertThat(names(search(UserFilter.of("Lovelace"))))
                     .containsExactly("Ada Lovelace");
         }
 
         @Test
         void theSearchMatchesPartOfAnEmail() {
-            assertThat(names(search(UserSpecifications.matchesText("example.com"))))
+            assertThat(names(search(UserFilter.of("example.com"))))
                     .containsExactly("Alan Turing");
         }
 
         @Test
         void theSearchIgnoresCase() {
-            assertThat(names(search(UserSpecifications.matchesText("lovelace"))))
-                    .isEqualTo(names(search(UserSpecifications.matchesText("LOVELACE"))));
+            assertThat(names(search(UserFilter.of("lovelace"))))
+                    .isEqualTo(names(search(UserFilter.of("LOVELACE"))));
         }
 
         @Test
         void theSearchMatchesFromTheMiddleOfTheWord() {
-            assertThat(names(search(UserSpecifications.matchesText("urin"))))
+            assertThat(names(search(UserFilter.of("urin"))))
                     .containsExactly("Alan Turing");
         }
 
         @Test
         void anAbsentSearchMatchesEveryone() {
-            assertThat(search(UserSpecifications.matchesText(null))).hasSize(3);
-            assertThat(search(UserSpecifications.matchesText("  "))).hasSize(3);
+            assertThat(search(UserFilter.of(null))).hasSize(3);
+            assertThat(search(UserFilter.of("  "))).hasSize(3);
         }
 
         @Test
         void filteringSeparatesActiveFromInactiveOperators() {
             deactivate("alan@example.com");
 
-            assertThat(search(UserSpecifications.hasActive(true))).hasSize(2);
-            assertThat(search(UserSpecifications.hasActive(false))).hasSize(1);
+            assertThat(search(filteredBy("true"))).hasSize(2);
+            assertThat(search(filteredBy("false"))).hasSize(1);
         }
 
         @Test
         void anAbsentFilterMatchesBoth() {
             deactivate("alan@example.com");
 
-            assertThat(search(UserSpecifications.hasActive(null))).hasSize(3);
+            assertThat(search(UserFilter.of(null))).hasSize(3);
+        }
+
+        @Test
+        void severalValuesOfOneFilterMatchAnyOfThem() {
+            deactivate("alan@example.com");
+
+            assertThat(search(filteredBy("true", "false"))).hasSize(3);
         }
 
         @Test
         void aSearchAndAFilterMustBothMatch() {
             deactivate("ada@recurve.local");
 
-            Specification<User> both = Specification.allOf(
-                    UserSpecifications.matchesText("recurve.local"),
-                    UserSpecifications.hasActive(true));
+            UserFilter both = new UserFilter("recurve.local",
+                    Map.of(UserFilterField.ACTIVE, List.of("true")));
 
             assertThat(names(search(both))).containsExactly("Grace Hopper");
         }
@@ -191,7 +199,7 @@ class UserRepositoryTest {
             register("Ada Lovelace", "ada@recurve.local", Set.of());
 
             Page<User> found = repository.findAll(
-                    UserSpecifications.matchesText("Lovelace"),
+                    UserSpecifications.from(UserFilter.of("Lovelace")),
                     PageRequest.of(0, 2, Sort.by("name")));
 
             assertThat(found.getTotalElements()).isEqualTo(1);
@@ -224,11 +232,17 @@ class UserRepositoryTest {
     }
 
     private Page<User> page(int number, int size, Sort sort) {
-        return repository.findAll(UserSpecifications.matchesText(null), PageRequest.of(number, size, sort));
+        return repository.findAll(UserSpecifications.from(UserFilter.of(null)),
+                PageRequest.of(number, size, sort));
     }
 
-    private Page<User> search(Specification<User> specification) {
-        return repository.findAll(specification, PageRequest.of(0, 20, Sort.by("name")));
+    private Page<User> search(UserFilter filter) {
+        return repository.findAll(UserSpecifications.from(filter),
+                PageRequest.of(0, 20, Sort.by("name")));
+    }
+
+    private static UserFilter filteredBy(String... active) {
+        return new UserFilter(null, Map.of(UserFilterField.ACTIVE, List.of(active)));
     }
 
     private static List<String> names(Page<User> page) {

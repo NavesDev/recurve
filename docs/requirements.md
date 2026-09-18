@@ -77,8 +77,13 @@ names here are business terms, not code identifiers.
 Applies to listings. Search is free text, case-insensitive, by substring.
 Filters combine with AND; multiple values of the same filter combine with
 OR. Sort accepts one field and a direction (ascending/descending); a field
-outside the allowed list is a validation error. Every listing is paginated
-(FR-07).
+outside the allowed list is a validation error, and so is a filter over a
+field the listing does not offer — neither is an empty result. Every
+listing is paginated (FR-07).
+
+Filters are named, not positional: a listing offers a set of filterable
+fields and a caller states which of them it wants and with what values.
+Which fields a listing offers is part of that listing's contract.
 
 #### FR-06.1 Operators
 

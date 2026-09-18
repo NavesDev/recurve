@@ -5,7 +5,6 @@ import java.util.UUID;
 
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
-import org.springframework.data.jpa.domain.Specification;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
@@ -85,11 +84,7 @@ public class UserService {
     @PreAuthorize("hasAuthority('VIEW_USERS')")
     @Transactional(readOnly = true)
     public Page<User> search(UserFilter filter, Pageable pageable) {
-        Specification<User> specification = Specification
-                .allOf(UserSpecifications.matchesText(filter.text()),
-                        UserSpecifications.hasActive(filter.active()));
-
-        return repository.findAll(specification, pageable);
+        return repository.findAll(UserSpecifications.from(filter), pageable);
     }
 
     private User findOrThrow(UUID id) {

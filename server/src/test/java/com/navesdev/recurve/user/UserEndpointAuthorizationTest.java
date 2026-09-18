@@ -7,9 +7,16 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 import java.time.Instant;
+import java.util.List;
 import java.util.Set;
 
+import static org.assertj.core.api.Assertions.assertThat;
+
+import com.jayway.jsonpath.JsonPath;
+
 import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.DisplayName;
+import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
@@ -56,10 +63,12 @@ class UserEndpointAuthorizationTest {
     void setUp() {
         entityManager.createNativeQuery("TRUNCATE users CASCADE").executeUpdate();
 
-        register("manager@recurve.local", Set.of(Permission.MANAGE_USERS), true);
-        register("viewer@recurve.local", Set.of(Permission.VIEW_USERS), true);
-        register("outsider@recurve.local", Set.of(Permission.VIEW_PLANS), true);
-        register("retired@recurve.local", Set.of(Permission.MANAGE_USERS), false);
+        // Distinct names on purpose: sorting by name has nothing to say
+        // about operators whose names all tie.
+        register("Maya Manager", "manager@recurve.local", Set.of(Permission.MANAGE_USERS), true);
+        register("Vera Viewer", "viewer@recurve.local", Set.of(Permission.VIEW_USERS), true);
+        register("Otto Outsider", "outsider@recurve.local", Set.of(Permission.VIEW_PLANS), true);
+        register("Rita Retired", "retired@recurve.local", Set.of(Permission.MANAGE_USERS), false);
         entityManager.flush();
     }
 
@@ -141,6 +150,54 @@ class UserEndpointAuthorizationTest {
                 .andExpect(jsonPath("$.items[0].email").value("viewer@recurve.local"));
     }
 
+    @Nested
+    @DisplayName("FR-06 sorting a listing")
+    class Ordering {
+
+        @Test
+        void theDirectionDecidesWhichEndOfTheFieldComesFirst() throws Exception {
+            List<String> ascending = emailsSortedBy("email", "asc");
+            List<String> descending = emailsSortedBy("email", "desc");
+
+            assertThat(ascending).isSorted();
+            assertThat(descending).containsExactlyElementsOf(ascending.reversed());
+        }
+
+        @Test
+        void theDirectionAppliesToWhicheverFieldWasChosen() throws Exception {
+            assertThat(emailsSortedBy("name", "asc"))
+                    .isNotEqualTo(emailsSortedBy("name", "desc"));
+        }
+
+        @Test
+        void aListingWithNoDirectionAsksForAscending() throws Exception {
+            assertThat(emailsSortedBy("email", null))
+                    .containsExactlyElementsOf(emailsSortedBy("email", "asc"));
+        }
+
+        @Test
+        void aListingWithNoSortComesBackByNameAscending() throws Exception {
+            assertThat(emailsSortedBy(null, null))
+                    .containsExactlyElementsOf(emailsSortedBy("name", "asc"));
+        }
+
+        private List<String> emailsSortedBy(String sort, String direction) throws Exception {
+            var request = get("/api/users").with(basic("manager@recurve.local"));
+            if (sort != null) {
+                request = request.param("sort", sort);
+            }
+            if (direction != null) {
+                request = request.param("direction", direction);
+            }
+
+            String json = mvc.perform(request)
+                    .andExpect(status().isOk())
+                    .andReturn().getResponse().getContentAsString();
+
+            return JsonPath.read(json, "$.items[*].email");
+        }
+    }
+
     private static String body(String email) {
         return """
                 {"name":"New Operator","email":"%s","password":"%s","permissions":["VIEW_PLANS"]}
@@ -151,8 +208,8 @@ class UserEndpointAuthorizationTest {
         return httpBasic(email, PASSWORD);
     }
 
-    private void register(String email, Set<Permission> permissions, boolean active) {
-        User operator = User.create("Operator", email, passwordEncoder.encode(PASSWORD), permissions, NOW);
+    private void register(String name, String email, Set<Permission> permissions, boolean active) {
+        User operator = User.create(name, email, passwordEncoder.encode(PASSWORD), permissions, NOW);
         if (!active) {
             operator.deactivate();
         }

@@ -76,12 +76,16 @@ feature so the dependency rule reads the same way:
 shared/
 ├── config/               # SecurityConfig, ClockConfig
 ├── controller/           # GlobalExceptionHandler, ApiError, PageResponse
+├── repository/           # BaseRepository, the contract every repository follows
 └── domain/exception/     # the abstract exception bases
 ```
 
-`shared/` is not a feature: it has no service and no repository, and it
-never imports a feature. Features import it, never the reverse. Anything
-that starts wanting business rules belongs in a feature instead.
+`shared/` is not a feature: it holds no state, no use case and no business
+rule, and it never imports a feature. Features import it, never the
+reverse. What lives here is either infrastructure or a contract —
+`BaseRepository` is `@NoRepositoryBean`, a type to conform to rather than
+a repository of its own. Anything that starts wanting business rules
+belongs in a feature instead.
 
 The schema lives outside Java, in `src/main/resources/db/migration`.
 
@@ -145,10 +149,22 @@ public class Subscriber {
 
 ### Persistence (`repository/`)
 
-Spring Data interface. `JpaSpecificationExecutor` when the listing has
-dynamic filters. Custom queries via `@Query` or `Specification` in a
-dedicated class (`SubscriberSpecifications`). Never business logic; never
-calls an entity's business method.
+Spring Data interface. Every repository extends
+`shared/repository/BaseRepository`, which fixes the minimum surface —
+`save`, `findById`, `existsById`, `count`, plus specification-based
+listing — and stops there.
+
+`BaseRepository` deliberately does not extend `JpaRepository`. Nothing in
+Recurve deletes a record: an operator is deactivated, a plan and a price
+are deactivated, a subscriber is canceled. A repository that offers no
+`deleteAll` makes that a property of the type rather than of everyone's
+discipline. It also withholds the unbounded `findAll()`, since every
+listing is paginated (FR-07).
+
+A feature's repository adds only what its use cases need — a lookup by a
+natural key, an existence check. Custom queries via `@Query` or a
+`Specification` in a dedicated class (`SubscriberSpecifications`). Never
+business logic; never calls an entity's business method.
 
 ### Application (`service/`)
 
@@ -414,6 +430,29 @@ Flyway owns the schema. Migrations are `V<n>__<description>.sql` under
 correction is a new migration, never an edit of an applied one. Hibernate
 runs with `ddl-auto: validate`, so a mapping that drifts from the schema
 fails at startup instead of quietly altering a table.
+
+**One migration, one scope.** A migration carries a single change, and its
+description says which one. There is no migration that creates the `user`
+tables and the `plan` tables; those are two migrations, because they are
+two changes that are reviewed, reasoned about and — if it comes to it —
+reverted independently. The same holds for a change that is not a table:
+adding a column, adding an index and backfilling data are three scopes,
+not one.
+
+The unit of scope is the **aggregate**, not the table. A collection table
+belongs to the aggregate that owns it and has no meaning without it, so
+`users` and `user_permissions` are created by one migration, and
+`plans` and `plan_prices` will be created by another. Splitting an
+aggregate across migrations would leave a version of the schema in which
+the aggregate cannot be persisted at all.
+
+| Scope | Migration |
+|---|---|
+| operators and their permissions | `V1__create_users.sql` |
+| plans and their prices | a separate one |
+| subscribers | a separate one |
+| payments | a separate one |
+| an index added to an existing table | a separate one |
 
 Boot 4 autoconfigures per technology, so the integration comes from
 `spring-boot-flyway`; `flyway-core` on its own would sit on the classpath

@@ -1,4 +1,10 @@
--- Operators (FR-01) and their granular permissions (BR-01).
+-- Scope: the operator aggregate (FR-01) and nothing else.
+--
+-- user_permissions is a collection table of that aggregate, not a table of
+-- its own: an operator's permissions have no meaning apart from the
+-- operator, and a schema version holding one without the other could not
+-- persist an operator at all. Plans, subscribers and payments each get
+-- their own migration.
 
 CREATE TABLE users (
     id            uuid         PRIMARY KEY,

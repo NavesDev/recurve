@@ -6,6 +6,7 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
@@ -15,11 +16,13 @@ import java.time.ZoneOffset;
 import java.util.List;
 import java.util.Set;
 
+import org.junit.jupiter.api.DisplayName;
+import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.boot.test.context.TestConfiguration;
 import org.springframework.boot.webmvc.test.autoconfigure.WebMvcTest;
 import org.springframework.context.annotation.Bean;
-import org.springframework.boot.test.context.TestConfiguration;
 import org.springframework.context.annotation.Import;
 import org.springframework.data.domain.PageImpl;
 import org.springframework.data.domain.PageRequest;
@@ -35,13 +38,13 @@ import com.navesdev.recurve.user.service.UserFilter;
 import com.navesdev.recurve.user.service.UserService;
 
 /**
- * The service is mocked, so this covers request validation, serialization
- * and HTTP status only — authorization is exercised where the real service
- * is, in {@code UserEndpointAuthorizationTest}.
+ * What the API promises a client: the shape of a page, what counts as a
+ * bad request, and that a password never travels back out. Authorization
+ * needs the real service, so it lives in
+ * {@code UserEndpointAuthorizationTest}.
  */
 @WebMvcTest(UserController.class)
 @Import({ GlobalExceptionHandler.class, UserControllerTest.FixedClock.class })
-
 class UserControllerTest {
 
     private static final Instant NOW = Instant.parse("2026-01-15T10:00:00Z");
@@ -60,82 +63,141 @@ class UserControllerTest {
     @MockitoBean
     private UserService service;
 
-    @Test
-    void createsAndReturnsTheLocation() throws Exception {
-        when(service.create(any(CreateUserCommand.class))).thenReturn(operator());
+    @Nested
+    @DisplayName("FR-01.1 an operator is registered with name, email and password")
+    class Registering {
 
-        mvc.perform(post("/api/users")
-                .contentType(MediaType.APPLICATION_JSON)
-                .content("""
-                        {
-                          "name": "Ada",
-                          "email": "ada@recurve.local",
-                          "password": "s3cret-password",
-                          "permissions": ["MANAGE_USERS"]
-                        }
-                        """))
-                .andExpect(status().isCreated())
-                .andExpect(jsonPath("$.name").value("Ada"))
-                .andExpect(jsonPath("$.email").value("ada@recurve.local"));
+        @Test
+        void aCompleteRegistrationIsAccepted() throws Exception {
+            when(service.create(any(CreateUserCommand.class))).thenReturn(operator());
+
+            mvc.perform(register("""
+                    {"name":"Ada","email":"ada@recurve.local","password":"s3cret-password"}
+                    """))
+                    .andExpect(status().isCreated())
+                    .andExpect(jsonPath("$.email").value("ada@recurve.local"));
+        }
+
+        @Test
+        void aRegistrationMissingTheNameIsRefused() throws Exception {
+            mvc.perform(register("""
+                    {"name":"","email":"ada@recurve.local","password":"s3cret-password"}
+                    """))
+                    .andExpect(status().isBadRequest())
+                    .andExpect(jsonPath("$.fieldErrors[*].field").value("name"));
+
+            verify(service, never()).create(any());
+        }
+
+        @Test
+        void anAddressThatIsNotAnEmailIsRefused() throws Exception {
+            mvc.perform(register("""
+                    {"name":"Ada","email":"not-an-email","password":"s3cret-password"}
+                    """))
+                    .andExpect(status().isBadRequest())
+                    .andExpect(jsonPath("$.fieldErrors[*].field").value("email"));
+
+            verify(service, never()).create(any());
+        }
+
+        @Test
+        void aPasswordTooShortToBeWorthHashingIsRefused() throws Exception {
+            mvc.perform(register("""
+                    {"name":"Ada","email":"ada@recurve.local","password":"short"}
+                    """))
+                    .andExpect(status().isBadRequest())
+                    .andExpect(jsonPath("$.fieldErrors[*].field").value("password"));
+
+            verify(service, never()).create(any());
+        }
+
+        @Test
+        void everyProblemWithTheRegistrationIsReportedAtOnce() throws Exception {
+            mvc.perform(register("""
+                    {"name":"","email":"not-an-email","password":"short"}
+                    """))
+                    .andExpect(status().isBadRequest())
+                    .andExpect(jsonPath("$.fieldErrors.length()").value(3));
+        }
     }
 
-    @Test
-    void neverSerializesThePasswordHash() throws Exception {
-        when(service.create(any(CreateUserCommand.class))).thenReturn(operator());
+    @Nested
+    @DisplayName("A password never leaves the system")
+    class PasswordNeverEscapes {
 
-        mvc.perform(post("/api/users")
-                .contentType(MediaType.APPLICATION_JSON)
-                .content("""
-                        {"name":"Ada","email":"ada@recurve.local","password":"s3cret-password"}
-                        """))
-                .andExpect(status().isCreated())
-                .andExpect(jsonPath("$.passwordHash").doesNotExist())
-                .andExpect(jsonPath("$.password").doesNotExist());
+        @Test
+        void neitherTheHashNorThePasswordIsEverSentBack() throws Exception {
+            when(service.create(any(CreateUserCommand.class))).thenReturn(operator());
+
+            mvc.perform(register("""
+                    {"name":"Ada","email":"ada@recurve.local","password":"s3cret-password"}
+                    """))
+                    .andExpect(status().isCreated())
+                    .andExpect(jsonPath("$.passwordHash").doesNotExist())
+                    .andExpect(jsonPath("$.password").doesNotExist())
+                    .andExpect(content().string(org.hamcrest.Matchers.not(
+                            org.hamcrest.Matchers.containsString("s3cret-password"))));
+        }
     }
 
-    @Test
-    void rejectsAnInvalidBodyWithFieldErrors() throws Exception {
-        mvc.perform(post("/api/users")
-                .contentType(MediaType.APPLICATION_JSON)
-                .content("""
-                        {"name":"","email":"not-an-email","password":"short"}
-                        """))
-                .andExpect(status().isBadRequest())
-                .andExpect(jsonPath("$.fieldErrors").isArray());
+    @Nested
+    @DisplayName("FR-07 a listing answers with a page")
+    class Listing {
 
-        verify(service, never()).create(any());
+        @Test
+        void thePageReportsItsItemsItsPositionAndTheTotal() throws Exception {
+            when(service.search(any(UserFilter.class), any()))
+                    .thenReturn(new PageImpl<>(List.of(operator()), PageRequest.of(0, 20), 42));
+
+            mvc.perform(get("/api/users"))
+                    .andExpect(status().isOk())
+                    .andExpect(jsonPath("$.items.length()").value(1))
+                    .andExpect(jsonPath("$.page").value(0))
+                    .andExpect(jsonPath("$.size").value(20))
+                    .andExpect(jsonPath("$.total").value(42));
+        }
+
+        @Test
+        void askingForMoreThanTheMaximumPageSizeIsAValidationError() throws Exception {
+            mvc.perform(get("/api/users").param("size", "101"))
+                    .andExpect(status().isBadRequest());
+
+            verify(service, never()).search(any(), any());
+        }
+
+        @Test
+        void askingForAnEmptyPageIsAValidationError() throws Exception {
+            mvc.perform(get("/api/users").param("size", "0"))
+                    .andExpect(status().isBadRequest());
+        }
+
+        @Test
+        void askingForAPageBeforeTheFirstIsAValidationError() throws Exception {
+            mvc.perform(get("/api/users").param("page", "-1"))
+                    .andExpect(status().isBadRequest());
+        }
+
+        @Test
+        void sortingByAFieldOutsideTheAllowedListIsAValidationError() throws Exception {
+            mvc.perform(get("/api/users").param("sort", "passwordHash"))
+                    .andExpect(status().isBadRequest());
+
+            verify(service, never()).search(any(), any());
+        }
+
+        @Test
+        void aDirectionThatIsNeitherAscendingNorDescendingIsAValidationError() throws Exception {
+            mvc.perform(get("/api/users").param("direction", "sideways"))
+                    .andExpect(status().isBadRequest());
+        }
     }
 
-    @Test
-    void returnsAPageEnvelope() throws Exception {
-        when(service.search(any(UserFilter.class), any()))
-                .thenReturn(new PageImpl<>(List.of(operator()), PageRequest.of(0, 20), 1));
-
-        mvc.perform(get("/api/users"))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$.items.length()").value(1))
-                .andExpect(jsonPath("$.page").value(0))
-                .andExpect(jsonPath("$.size").value(20))
-                .andExpect(jsonPath("$.total").value(1));
-    }
-
-    @Test
-    void rejectsAPageSizeOverTheMaximum() throws Exception {
-        mvc.perform(get("/api/users").param("size", "101"))
-                .andExpect(status().isBadRequest());
-
-        verify(service, never()).search(any(), any());
-    }
-
-    @Test
-    void rejectsASortFieldOutsideTheAllowedList() throws Exception {
-        mvc.perform(get("/api/users").param("sort", "passwordHash"))
-                .andExpect(status().isBadRequest());
-
-        verify(service, never()).search(any(), any());
+    private static org.springframework.test.web.servlet.RequestBuilder register(String body) {
+        return post("/api/users").contentType(MediaType.APPLICATION_JSON).content(body);
     }
 
     private static User operator() {
-        return User.create("Ada", "ada@recurve.local", "hash", Set.of(Permission.MANAGE_USERS), NOW);
+        return User.create("Ada", "ada@recurve.local", "$2a$10$hash",
+                Set.of(Permission.MANAGE_USERS), NOW);
     }
 }

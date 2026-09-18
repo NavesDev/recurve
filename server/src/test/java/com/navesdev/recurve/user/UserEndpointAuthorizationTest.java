@@ -23,6 +23,9 @@ import com.navesdev.recurve.user.domain.Permission;
 import com.navesdev.recurve.user.domain.User;
 import com.navesdev.recurve.user.repository.UserRepository;
 
+import jakarta.persistence.EntityManager;
+import jakarta.persistence.PersistenceContext;
+
 /**
  * Crosses every layer: real HTTP Basic against the real service, so it
  * covers what a mocked service cannot — that {@code @PreAuthorize} runs,
@@ -46,18 +49,18 @@ class UserEndpointAuthorizationTest {
     @Autowired
     private PasswordEncoder passwordEncoder;
 
+    @PersistenceContext
+    private EntityManager entityManager;
+
     @BeforeEach
     void setUp() {
-        // Hibernate flushes inserts before deletes, so the delete has to
-        // be issued before the fixtures or it collides on the unique email.
-        repository.deleteAll();
-        repository.flush();
-        repository.saveAll(Set.of(
-                operator("manager@recurve.local", Set.of(Permission.MANAGE_USERS), true),
-                operator("viewer@recurve.local", Set.of(Permission.VIEW_USERS), true),
-                operator("outsider@recurve.local", Set.of(Permission.VIEW_PLANS), true),
-                operator("retired@recurve.local", Set.of(Permission.MANAGE_USERS), false)));
-        repository.flush();
+        entityManager.createNativeQuery("TRUNCATE users CASCADE").executeUpdate();
+
+        register("manager@recurve.local", Set.of(Permission.MANAGE_USERS), true);
+        register("viewer@recurve.local", Set.of(Permission.VIEW_USERS), true);
+        register("outsider@recurve.local", Set.of(Permission.VIEW_PLANS), true);
+        register("retired@recurve.local", Set.of(Permission.MANAGE_USERS), false);
+        entityManager.flush();
     }
 
     @Test
@@ -148,11 +151,11 @@ class UserEndpointAuthorizationTest {
         return httpBasic(email, PASSWORD);
     }
 
-    private User operator(String email, Set<Permission> permissions, boolean active) {
-        User user = User.create("Operator", email, passwordEncoder.encode(PASSWORD), permissions, NOW);
+    private void register(String email, Set<Permission> permissions, boolean active) {
+        User operator = User.create("Operator", email, passwordEncoder.encode(PASSWORD), permissions, NOW);
         if (!active) {
-            user.deactivate();
+            operator.deactivate();
         }
-        return user;
+        repository.save(operator);
     }
 }

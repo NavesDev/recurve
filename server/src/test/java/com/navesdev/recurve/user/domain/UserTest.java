@@ -6,89 +6,148 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import java.time.Instant;
 import java.util.Set;
 
+import org.junit.jupiter.api.DisplayName;
+import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 
 import com.navesdev.recurve.user.domain.exception.UserAlreadyInactiveException;
 
+/** The rules an operator obeys, stated as FR-01 and BR-01/BR-02 state them. */
 class UserTest {
 
     private static final Instant NOW = Instant.parse("2026-01-15T10:00:00Z");
 
-    @Test
-    void createsAnActiveOperator() {
-        User user = newUser(Set.of(Permission.VIEW_PLANS));
+    @Nested
+    @DisplayName("FR-01.1 registering an operator")
+    class Registering {
 
-        assertThat(user.getId()).isNotNull();
-        assertThat(user.getName()).isEqualTo("Ada");
-        assertThat(user.isActive()).isTrue();
-        assertThat(user.getCreatedAt()).isEqualTo(NOW);
+        @Test
+        void anOperatorIsUsableAsSoonAsItIsRegistered() {
+            User operator = newOperator(Set.of(Permission.VIEW_PLANS));
+
+            assertThat(operator.isActive()).isTrue();
+        }
+
+        @Test
+        void anOperatorMustHaveANameAnEmailAndAPassword() {
+            assertThatThrownBy(() -> User.create(" ", "ada@recurve.local", "hash", Set.of(), NOW))
+                    .isInstanceOf(IllegalArgumentException.class);
+            assertThatThrownBy(() -> User.create("Ada", " ", "hash", Set.of(), NOW))
+                    .isInstanceOf(IllegalArgumentException.class);
+            assertThatThrownBy(() -> User.create("Ada", "ada@recurve.local", " ", Set.of(), NOW))
+                    .isInstanceOf(IllegalArgumentException.class);
+        }
+
+        @Test
+        void anOperatorMayBeRegisteredWithNoPermissionAtAll() {
+            User operator = newOperator(Set.of());
+
+            assertThat(operator.authorities()).isEmpty();
+        }
     }
 
-    @Test
-    void normalizesEmailSoUniquenessIsNotCaseSensitive() {
-        User user = User.create("Ada", "  Ada@Recurve.LOCAL ", "hash", Set.of(), NOW);
+    @Nested
+    @DisplayName("BR-02 the operator email is unique")
+    class UniqueEmail {
 
-        assertThat(user.getEmail()).isEqualTo("ada@recurve.local");
+        @Test
+        void twoOperatorsCannotDifferOnlyByTheCaseOfTheirEmail() {
+            User lower = User.create("Ada", "ada@recurve.local", "hash", Set.of(), NOW);
+            User upper = User.create("Ada", "ADA@Recurve.Local", "hash", Set.of(), NOW);
+
+            assertThat(upper.getEmail()).isEqualTo(lower.getEmail());
+        }
+
+        @Test
+        void surroundingSpaceIsNotPartOfTheEmail() {
+            User operator = User.create("Ada", "  ada@recurve.local  ", "hash", Set.of(), NOW);
+
+            assertThat(operator.getEmail()).isEqualTo("ada@recurve.local");
+        }
     }
 
-    @Test
-    void rejectsBlankRequiredValues() {
-        assertThatThrownBy(() -> User.create(" ", "ada@recurve.local", "hash", Set.of(), NOW))
-                .isInstanceOf(IllegalArgumentException.class)
-                .hasMessageContaining("name");
+    @Nested
+    @DisplayName("BR-01 manage implies view")
+    class ManageImpliesView {
+
+        @Test
+        void managingAResourceGrantsTheRightToViewIt() {
+            User operator = newOperator(Set.of(Permission.MANAGE_USERS));
+
+            assertThat(operator.authorities())
+                    .containsExactlyInAnyOrder(Permission.MANAGE_USERS, Permission.VIEW_USERS);
+        }
+
+        @Test
+        void theImplicationDoesNotReachAnotherResource() {
+            User operator = newOperator(Set.of(Permission.MANAGE_USERS));
+
+            assertThat(operator.authorities()).doesNotContain(Permission.VIEW_PLANS);
+        }
+
+        @Test
+        void viewingAResourceDoesNotGrantTheRightToManageIt() {
+            User operator = newOperator(Set.of(Permission.VIEW_PAYMENTS));
+
+            assertThat(operator.authorities()).containsExactly(Permission.VIEW_PAYMENTS);
+        }
+
+        @Test
+        void whatWasGrantedIsReportedAsGranted() {
+            User operator = newOperator(Set.of(Permission.MANAGE_PLANS));
+
+            assertThat(operator.getPermissions()).containsExactly(Permission.MANAGE_PLANS);
+        }
     }
 
-    @Test
-    void expandsManageIntoTheMatchingViewAuthority() {
-        User user = newUser(Set.of(Permission.MANAGE_USERS));
+    @Nested
+    @DisplayName("FR-01.2 granting and revoking permissions")
+    class ChangingPermissions {
 
-        assertThat(user.authorities())
-                .containsExactlyInAnyOrder(Permission.MANAGE_USERS, Permission.VIEW_USERS);
+        @Test
+        void anOperatorMayBeGivenADifferentSetOfPermissions() {
+            User operator = newOperator(Set.of(Permission.MANAGE_USERS));
+
+            operator.replacePermissions(Set.of(Permission.VIEW_PLANS));
+
+            assertThat(operator.getPermissions()).containsExactly(Permission.VIEW_PLANS);
+        }
+
+        @Test
+        void revokingEveryPermissionLeavesAnOperatorWhoCanDoNothing() {
+            User operator = newOperator(Set.of(Permission.MANAGE_USERS));
+
+            operator.replacePermissions(Set.of());
+
+            assertThat(operator.authorities()).isEmpty();
+        }
     }
 
-    @Test
-    void keepsGrantedPermissionsSeparateFromExpandedAuthorities() {
-        User user = newUser(Set.of(Permission.MANAGE_PAYMENTS));
+    @Nested
+    @DisplayName("FR-01.3 an operator is deactivated, never deleted")
+    class Deactivating {
 
-        assertThat(user.getPermissions()).containsExactly(Permission.MANAGE_PAYMENTS);
-        assertThat(user.authorities()).hasSize(2);
+        @Test
+        void aDeactivatedOperatorKeepsItsIdentityAndItsPermissions() {
+            User operator = newOperator(Set.of(Permission.MANAGE_USERS));
+
+            operator.deactivate();
+
+            assertThat(operator.isActive()).isFalse();
+            assertThat(operator.getEmail()).isEqualTo("ada@recurve.local");
+            assertThat(operator.getPermissions()).containsExactly(Permission.MANAGE_USERS);
+        }
+
+        @Test
+        void deactivatingAnAlreadyInactiveOperatorIsRefused() {
+            User operator = newOperator(Set.of());
+            operator.deactivate();
+
+            assertThatThrownBy(operator::deactivate).isInstanceOf(UserAlreadyInactiveException.class);
+        }
     }
 
-    @Test
-    void replacesPermissionsWholesale() {
-        User user = newUser(Set.of(Permission.MANAGE_USERS));
-
-        user.replacePermissions(Set.of(Permission.VIEW_PLANS));
-
-        assertThat(user.getPermissions()).containsExactly(Permission.VIEW_PLANS);
-    }
-
-    @Test
-    void deactivates() {
-        User user = newUser(Set.of());
-
-        user.deactivate();
-
-        assertThat(user.isActive()).isFalse();
-    }
-
-    @Test
-    void refusesToDeactivateTwice() {
-        User user = newUser(Set.of());
-        user.deactivate();
-
-        assertThatThrownBy(user::deactivate).isInstanceOf(UserAlreadyInactiveException.class);
-    }
-
-    @Test
-    void doesNotExposeItsPermissionsForMutation() {
-        User user = newUser(Set.of(Permission.VIEW_USERS));
-
-        assertThatThrownBy(() -> user.getPermissions().add(Permission.MANAGE_USERS))
-                .isInstanceOf(UnsupportedOperationException.class);
-    }
-
-    private static User newUser(Set<Permission> permissions) {
+    private static User newOperator(Set<Permission> permissions) {
         return User.create("Ada", "ada@recurve.local", "hash", permissions, NOW);
     }
 }

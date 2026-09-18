@@ -34,7 +34,10 @@ class UserRepositoryTest {
 
     @BeforeEach
     void setUp() {
+        // Hibernate flushes inserts before deletes, so the delete has to
+        // be issued before the fixtures or it collides on the unique email.
         repository.deleteAll();
+        repository.flush();
         repository.saveAll(List.of(
                 User.create("Ada Lovelace", "ada@recurve.local", "hash", Set.of(Permission.MANAGE_USERS), NOW),
                 User.create("Grace Hopper", "grace@recurve.local", "hash", Set.of(Permission.VIEW_PLANS), NOW),

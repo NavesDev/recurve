@@ -48,7 +48,10 @@ class UserEndpointAuthorizationTest {
 
     @BeforeEach
     void setUp() {
+        // Hibernate flushes inserts before deletes, so the delete has to
+        // be issued before the fixtures or it collides on the unique email.
         repository.deleteAll();
+        repository.flush();
         repository.saveAll(Set.of(
                 operator("manager@recurve.local", Set.of(Permission.MANAGE_USERS), true),
                 operator("viewer@recurve.local", Set.of(Permission.VIEW_USERS), true),

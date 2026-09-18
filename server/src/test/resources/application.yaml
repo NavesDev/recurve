@@ -1,0 +1,20 @@
+# Tests run against their own database, never the development one: a
+# repository test truncates tables, and pre-existing rows would collide
+# with its fixtures. docker-compose creates it alongside the dev database.
+spring:
+  datasource:
+    url: ${TEST_DB_URL:jdbc:postgresql://localhost:54330/recurve-test}
+    username: ${DB_USER:postgres}
+    password: ${DB_PASSWORD:postgres}
+  flyway:
+    enabled: true
+    clean-disabled: false
+  jpa:
+    hibernate:
+      ddl-auto: validate
+
+recurve:
+  bootstrap:
+    admin:
+      email: ""
+      password: ""

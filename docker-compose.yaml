@@ -10,6 +10,9 @@ services:
       - "54330:5432"
     volumes:
       - postgres_data:/var/lib/postgresql
+      # Runs only when the volume is first created. On an existing volume:
+      # docker exec -i recurve-database psql -U postgres -c 'CREATE DATABASE "recurve-test"'
+      - ./db/init:/docker-entrypoint-initdb.d:ro
 
 volumes:
   postgres_data:

@@ -419,6 +419,12 @@ Boot 4 autoconfigures per technology, so the integration comes from
 `spring-boot-flyway`; `flyway-core` on its own would sit on the classpath
 unwired.
 
+Tests point at their own database (`recurve-test`, created by
+`docker-compose` beside the development one) and never at the development
+database: a repository test clears tables, and rows left over from a
+manual run would collide with its fixtures. Each test still rolls back;
+the separate database is what makes that rollback enough.
+
 ### Lombok
 
 `@Getter` and `@RequiredArgsConstructor` only. No `@Setter` and no

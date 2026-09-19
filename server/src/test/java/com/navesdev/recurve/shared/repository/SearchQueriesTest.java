@@ -1,4 +1,4 @@
-package com.navesdev.recurve.user.repository;
+package com.navesdev.recurve.shared.repository;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
@@ -12,7 +12,7 @@ import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Sort;
 import org.springframework.data.elasticsearch.client.elc.NativeQuery;
 
-import com.navesdev.recurve.user.service.UserFilter;
+import com.navesdev.recurve.shared.service.SearchFilter;
 
 import co.elastic.clients.elasticsearch._types.SortOrder;
 import co.elastic.clients.elasticsearch._types.query_dsl.BoolQuery;
@@ -23,8 +23,9 @@ import co.elastic.clients.elasticsearch._types.query_dsl.Operator;
  * server. Whether Elasticsearch answers it as FR-06 expects is the
  * integration test's job.
  */
-class UserSearchQueriesTest {
+class SearchQueriesTest {
 
+    private static final List<String> SEARCHED = List.of("name", "email");
     private static final PageRequest FIRST_PAGE = PageRequest.of(0, 20, Sort.by("name.keyword"));
 
     @Nested
@@ -33,13 +34,13 @@ class UserSearchQueriesTest {
 
         @Test
         void anAbsentSearchAsksForNothingInParticular() {
-            assertThat(bool(UserFilter.of(null)).must()).isEmpty();
-            assertThat(bool(UserFilter.of("   ")).must()).isEmpty();
+            assertThat(bool(SearchFilter.of(null)).must()).isEmpty();
+            assertThat(bool(SearchFilter.of("   ")).must()).isEmpty();
         }
 
         @Test
-        void aSearchMustMatchOverNameOrEmailWithEveryWord() {
-            var match = bool(UserFilter.of("  Ada  ")).must().getFirst().multiMatch();
+        void aSearchMustMatchOverTheFieldsTheFeatureNamesWithEveryWord() {
+            var match = bool(SearchFilter.of("  Ada  ")).must().getFirst().multiMatch();
 
             assertThat(match.query()).isEqualTo("Ada");
             assertThat(match.fields()).containsExactly("name", "email");
@@ -53,7 +54,7 @@ class UserSearchQueriesTest {
 
         @Test
         void anAbsentFilterRestrictsNothing() {
-            assertThat(bool(UserFilter.of(null)).filter()).isEmpty();
+            assertThat(bool(SearchFilter.of(null)).filter()).isEmpty();
         }
 
         @Test
@@ -69,7 +70,7 @@ class UserSearchQueriesTest {
 
         @Test
         void aFieldTheListingDoesNotKnowIsPassedThroughForTheMappingToJudge() {
-            var terms = bool(new UserFilter(null, Map.of("permissions", List.of("MANAGE_SYSTEM"))))
+            var terms = bool(new SearchFilter(null, Map.of("permissions", List.of("MANAGE_SYSTEM"))))
                     .filter().getFirst().terms();
 
             assertThat(terms.field()).isEqualTo("permissions");
@@ -84,7 +85,7 @@ class UserSearchQueriesTest {
 
         @Test
         void aSearchAndAFilterAreBothRequired() {
-            BoolQuery both = bool(new UserFilter("ada", Map.of("active", List.of("true"))));
+            BoolQuery both = bool(new SearchFilter("ada", Map.of("active", List.of("true"))));
 
             assertThat(both.must()).hasSize(1);
             assertThat(both.filter()).hasSize(1);
@@ -99,8 +100,8 @@ class UserSearchQueriesTest {
         void theSortFieldIsSentAsNamedWithItsDirection() {
             // No translation: the contract names the index's own fields, so
             // a text field is sorted on its keyword copy by asking for it.
-            var sorts = UserSearchQueries.from(UserFilter.of(null),
-                    PageRequest.of(0, 20, Sort.by(Sort.Direction.DESC, "email.keyword"))).getSortOptions();
+            var sorts = SearchQueries.from(SearchFilter.of(null),
+                    PageRequest.of(0, 20, Sort.by(Sort.Direction.DESC, "email.keyword")), SEARCHED).getSortOptions();
 
             assertThat(sorts.getFirst().field().field()).isEqualTo("email.keyword");
             assertThat(sorts.getFirst().field().order()).isEqualTo(SortOrder.Desc);
@@ -108,10 +109,10 @@ class UserSearchQueriesTest {
 
         @Test
         void everySortKeyRequestedIsKeptInOrder() {
-            // FR-07.4: the controller appends id ascending; the query must
+            // FR-07.4: ListingRequests appends id ascending; the query must
             // keep it after the field the caller chose.
-            var sorts = UserSearchQueries.from(UserFilter.of(null),
-                    PageRequest.of(0, 20, Sort.by(Sort.Direction.DESC, "name.keyword").and(Sort.by("id"))))
+            var sorts = SearchQueries.from(SearchFilter.of(null),
+                    PageRequest.of(0, 20, Sort.by(Sort.Direction.DESC, "name.keyword").and(Sort.by("id"))), SEARCHED)
                     .getSortOptions();
 
             assertThat(sorts).hasSize(2);
@@ -121,14 +122,14 @@ class UserSearchQueriesTest {
 
         @Test
         void anUnsortedPageAsksForNoSortAndIsStillAValidQuery() {
-            NativeQuery query = UserSearchQueries.from(UserFilter.of(null), PageRequest.of(0, 10));
+            NativeQuery query = SearchQueries.from(SearchFilter.of(null), PageRequest.of(0, 10), SEARCHED);
 
             assertThat(query.getSortOptions()).isEmpty();
         }
 
         @Test
         void thePageIsCarriedWithoutItsSortSoItIsNotAppliedTwice() {
-            NativeQuery query = UserSearchQueries.from(UserFilter.of(null), PageRequest.of(3, 10, Sort.by("name.keyword")));
+            NativeQuery query = SearchQueries.from(SearchFilter.of(null), PageRequest.of(3, 10, Sort.by("name.keyword")), SEARCHED);
 
             assertThat(query.getPageable().getPageNumber()).isEqualTo(3);
             assertThat(query.getPageable().getPageSize()).isEqualTo(10);
@@ -136,11 +137,11 @@ class UserSearchQueriesTest {
         }
     }
 
-    private static BoolQuery bool(UserFilter filter) {
-        return UserSearchQueries.from(filter, FIRST_PAGE).getQuery().bool();
+    private static BoolQuery bool(SearchFilter filter) {
+        return SearchQueries.from(filter, FIRST_PAGE, SEARCHED).getQuery().bool();
     }
 
-    private static UserFilter activeIn(String... values) {
-        return new UserFilter(null, Map.of("active", List.of(values)));
+    private static SearchFilter activeIn(String... values) {
+        return new SearchFilter(null, Map.of("active", List.of(values)));
     }
 }

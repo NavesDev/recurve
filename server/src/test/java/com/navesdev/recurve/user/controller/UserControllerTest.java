@@ -37,11 +37,12 @@ import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
 
 import com.navesdev.recurve.shared.controller.GlobalExceptionHandler;
+import com.navesdev.recurve.shared.controller.ListingRequests;
 import com.navesdev.recurve.user.domain.Permission;
 import com.navesdev.recurve.user.domain.User;
 import com.navesdev.recurve.user.domain.UserSummary;
 import com.navesdev.recurve.user.service.CreateUserCommand;
-import com.navesdev.recurve.user.service.UserFilter;
+import com.navesdev.recurve.shared.service.SearchFilter;
 import com.navesdev.recurve.user.service.UserService;
 
 import co.elastic.clients.elasticsearch._types.ElasticsearchException;
@@ -55,7 +56,7 @@ import co.elastic.clients.elasticsearch._types.ErrorResponse;
  * {@code UserEndpointAuthorizationIT}.
  */
 @WebMvcTest(UserController.class)
-@Import({ GlobalExceptionHandler.class, UserControllerTest.FixedClock.class })
+@Import({ GlobalExceptionHandler.class, ListingRequests.class, UserControllerTest.FixedClock.class })
 class UserControllerTest {
 
     private static final Instant NOW = Instant.parse("2026-01-15T10:00:00Z");
@@ -157,7 +158,7 @@ class UserControllerTest {
 
         @Test
         void thePageReportsItsItemsItsPositionAndTheTotal() throws Exception {
-            when(service.search(any(UserFilter.class), any()))
+            when(service.search(any(SearchFilter.class), any()))
                     .thenReturn(new PageImpl<>(List.of(UserSummary.of(operator())), PageRequest.of(0, 20), 42));
 
             mvc.perform(get("/api/users"))
@@ -169,23 +170,13 @@ class UserControllerTest {
         }
 
         @Test
-        void askingForMoreThanTheMaximumPageSizeIsAValidationError() throws Exception {
+        void theListingParametersAreVettedBeforeTheServiceIsAsked() throws Exception {
+            // The rules themselves are ListingRequestsTest's; this only shows
+            // the endpoint goes through them.
             mvc.perform(get("/api/users").param("size", "101"))
                     .andExpect(status().isBadRequest());
 
             verify(service, never()).search(any(), any());
-        }
-
-        @Test
-        void askingForAnEmptyPageIsAValidationError() throws Exception {
-            mvc.perform(get("/api/users").param("size", "0"))
-                    .andExpect(status().isBadRequest());
-        }
-
-        @Test
-        void askingForAPageBeforeTheFirstIsAValidationError() throws Exception {
-            mvc.perform(get("/api/users").param("page", "-1"))
-                    .andExpect(status().isBadRequest());
         }
 
         @Test
@@ -194,7 +185,7 @@ class UserControllerTest {
             // name): nothing here translates or vets them. FR-07.4: id is
             // always the second key, ascending whichever way the caller asked.
             ArgumentCaptor<Pageable> sent = ArgumentCaptor.forClass(Pageable.class);
-            when(service.search(any(UserFilter.class), any()))
+            when(service.search(any(SearchFilter.class), any()))
                     .thenReturn(new PageImpl<>(List.of(), PageRequest.of(0, 20), 0));
 
             mvc.perform(get("/api/users").param("sort", "-email.keyword"))
@@ -208,7 +199,7 @@ class UserControllerTest {
         @Test
         void anAbsentSortIsByNameAscending() throws Exception {
             ArgumentCaptor<Pageable> sent = ArgumentCaptor.forClass(Pageable.class);
-            when(service.search(any(UserFilter.class), any()))
+            when(service.search(any(SearchFilter.class), any()))
                     .thenReturn(new PageImpl<>(List.of(), PageRequest.of(0, 20), 0));
 
             mvc.perform(get("/api/users")).andExpect(status().isOk());
@@ -221,7 +212,7 @@ class UserControllerTest {
         void aSortTheIndexRefusesIsABadRequestWithTheReasonElasticsearchGave() throws Exception {
             // The mapping decides what can be sorted on; a refusal from the
             // engine is the validation, and its reason names the field.
-            when(service.search(any(UserFilter.class), any()))
+            when(service.search(any(SearchFilter.class), any()))
                     .thenThrow(refusedBy("No mapping found for [passwordHash] in order to sort on"));
 
             mvc.perform(get("/api/users").param("sort", "passwordHash"))
@@ -232,7 +223,7 @@ class UserControllerTest {
 
         @Test
         void anyOtherFailureOfTheSearchEngineIsNotBlamedOnTheCaller() throws Exception {
-            when(service.search(any(UserFilter.class), any()))
+            when(service.search(any(SearchFilter.class), any()))
                     .thenThrow(new UncategorizedElasticsearchException("boom", 500, null, null));
 
             mvc.perform(get("/api/users"))
@@ -246,7 +237,7 @@ class UserControllerTest {
 
         @Test
         void aFilterTheListingOffersIsAccepted() throws Exception {
-            when(service.search(any(UserFilter.class), any()))
+            when(service.search(any(SearchFilter.class), any()))
                     .thenReturn(new PageImpl<>(List.of(UserSummary.of(operator())), PageRequest.of(0, 20), 1));
 
             mvc.perform(get("/api/users").param("filter", "active:true"))
@@ -257,8 +248,8 @@ class UserControllerTest {
         void severalValuesOfOneFieldTravelTogetherInOneFilter() throws Exception {
             // A comma separates values inside one criterion; it must not be
             // mistaken for a separator between criteria.
-            ArgumentCaptor<UserFilter> sent = ArgumentCaptor.forClass(UserFilter.class);
-            when(service.search(any(UserFilter.class), any()))
+            ArgumentCaptor<SearchFilter> sent = ArgumentCaptor.forClass(SearchFilter.class);
+            when(service.search(any(SearchFilter.class), any()))
                     .thenReturn(new PageImpl<>(List.of(), PageRequest.of(0, 20), 0));
 
             mvc.perform(get("/api/users").param("filter", "active:true,false"))
@@ -270,7 +261,7 @@ class UserControllerTest {
 
         @Test
         void severalFiltersAreAcceptedInOneRequest() throws Exception {
-            when(service.search(any(UserFilter.class), any()))
+            when(service.search(any(SearchFilter.class), any()))
                     .thenReturn(new PageImpl<>(List.of(), PageRequest.of(0, 20), 0));
 
             mvc.perform(get("/api/users")
@@ -283,8 +274,8 @@ class UserControllerTest {
         void aFilterFieldIsPassedThroughForTheIndexMappingToJudge() throws Exception {
             // Nothing here knows which fields exist: the mapping closes what
             // must stay closed, and a field it does not know matches nothing.
-            ArgumentCaptor<UserFilter> sent = ArgumentCaptor.forClass(UserFilter.class);
-            when(service.search(any(UserFilter.class), any()))
+            ArgumentCaptor<SearchFilter> sent = ArgumentCaptor.forClass(SearchFilter.class);
+            when(service.search(any(SearchFilter.class), any()))
                     .thenReturn(new PageImpl<>(List.of(), PageRequest.of(0, 20), 0));
 
             mvc.perform(get("/api/users").param("filter", "permissions:MANAGE_SYSTEM"))
@@ -296,7 +287,7 @@ class UserControllerTest {
 
         @Test
         void aFilterTheIndexRefusesIsABadRequestWithTheReasonElasticsearchGave() throws Exception {
-            when(service.search(any(UserFilter.class), any()))
+            when(service.search(any(SearchFilter.class), any()))
                     .thenThrow(refusedBy("Cannot search on field [permissions] since it is not indexed nor has doc values."));
 
             mvc.perform(get("/api/users").param("filter", "permissions:MANAGE_SYSTEM"))
@@ -307,7 +298,7 @@ class UserControllerTest {
 
         @Test
         void aValueTheFieldCannotMeanIsRefusedByTheIndexNotHere() throws Exception {
-            when(service.search(any(UserFilter.class), any()))
+            when(service.search(any(SearchFilter.class), any()))
                     .thenThrow(refusedBy("Failed to parse value [maybe] as only [true] or [false] are allowed."));
 
             mvc.perform(get("/api/users").param("filter", "active:maybe"))
@@ -360,7 +351,7 @@ class UserControllerTest {
 
         @Test
         void anUnreachableStoreIsAServiceUnavailableWithoutItsDetails() throws Exception {
-            when(service.search(any(UserFilter.class), any()))
+            when(service.search(any(SearchFilter.class), any()))
                     .thenThrow(new DataAccessResourceFailureException("connect to localhost:9230 refused"));
 
             mvc.perform(get("/api/users"))

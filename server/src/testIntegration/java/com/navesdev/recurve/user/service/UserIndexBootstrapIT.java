@@ -15,6 +15,7 @@ import org.springframework.data.domain.PageRequest;
 import org.springframework.data.elasticsearch.core.ElasticsearchOperations;
 import org.springframework.transaction.annotation.Transactional;
 
+import com.navesdev.recurve.shared.service.SearchFilter;
 import com.navesdev.recurve.user.domain.User;
 import com.navesdev.recurve.user.domain.UserSummary;
 import com.navesdev.recurve.user.repository.UserRepository;
@@ -67,7 +68,7 @@ class UserIndexBootstrapIT {
             bootstrap.run(null);
 
             assertThat(searchRepository.indexExists()).isTrue();
-            assertThat(searchRepository.search(UserFilter.of(null), PageRequest.of(0, 10)).getTotalElements())
+            assertThat(searchRepository.search(SearchFilter.of(null), PageRequest.of(0, 10)).getTotalElements())
                     .isEqualTo(2);
         }
 
@@ -78,7 +79,7 @@ class UserIndexBootstrapIT {
             bootstrap.run(null);
 
             // Word-prefix matching only exists with the analyzer from search/users-settings.json.
-            assertThat(searchRepository.search(UserFilter.of("hopp"), PageRequest.of(0, 10)).getTotalElements())
+            assertThat(searchRepository.search(SearchFilter.of("hopp"), PageRequest.of(0, 10)).getTotalElements())
                     .isEqualTo(1);
         }
     }
@@ -94,7 +95,7 @@ class UserIndexBootstrapIT {
 
             bootstrap.run(null);
 
-            assertThat(searchRepository.search(UserFilter.of(null), PageRequest.of(0, 10)).getTotalElements())
+            assertThat(searchRepository.search(SearchFilter.of(null), PageRequest.of(0, 10)).getTotalElements())
                     .isEqualTo(1);
         }
     }

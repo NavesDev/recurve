@@ -35,6 +35,7 @@ import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 import org.springframework.security.crypto.password.PasswordEncoder;
 
+import com.navesdev.recurve.shared.service.SearchFilter;
 import com.navesdev.recurve.user.domain.Permission;
 import com.navesdev.recurve.user.domain.User;
 import com.navesdev.recurve.user.domain.UserSummary;
@@ -261,7 +262,7 @@ class UserServiceTest {
 
         @Test
         void theListingAsksTheIndexAndNeverTheDatabase() {
-            UserFilter filter = UserFilter.of("ada");
+            SearchFilter filter = SearchFilter.of("ada");
             Pageable page = PageRequest.of(0, 20);
             Page<UserSummary> expected = new PageImpl<>(List.of());
             when(searchRepository.search(filter, page)).thenReturn(expected);

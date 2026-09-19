@@ -28,7 +28,7 @@ import org.springframework.data.elasticsearch.UncategorizedElasticsearchExceptio
 import com.navesdev.recurve.user.domain.Permission;
 import com.navesdev.recurve.user.domain.User;
 import com.navesdev.recurve.user.domain.UserSummary;
-import com.navesdev.recurve.user.service.UserFilter;
+import com.navesdev.recurve.shared.service.SearchFilter;
 
 import co.elastic.clients.elasticsearch._types.ElasticsearchException;
 
@@ -64,47 +64,47 @@ class UserSearchRepositoryIT {
 
         @Test
         void theSearchMatchesAWholeWordOfAName() {
-            assertThat(names(search(UserFilter.of("Lovelace")))).containsExactly("Ada Lovelace");
+            assertThat(names(search(SearchFilter.of("Lovelace")))).containsExactly("Ada Lovelace");
         }
 
         @Test
         void theSearchMatchesTheStartOfAnyWordOfAName() {
-            assertThat(names(search(UserFilter.of("Love")))).containsExactly("Ada Lovelace");
-            assertThat(names(search(UserFilter.of("hopp")))).containsExactly("Grace Hopper");
+            assertThat(names(search(SearchFilter.of("Love")))).containsExactly("Ada Lovelace");
+            assertThat(names(search(SearchFilter.of("hopp")))).containsExactly("Grace Hopper");
         }
 
         @Test
         void theSearchMatchesTheStartOfAnEmail() {
-            assertThat(names(search(UserFilter.of("ala")))).containsExactly("Alan Turing");
+            assertThat(names(search(SearchFilter.of("ala")))).containsExactly("Alan Turing");
         }
 
         @Test
         void theSearchMatchesTheDomainOfAnEmail() {
-            assertThat(names(search(UserFilter.of("example.com")))).containsExactly("Alan Turing");
+            assertThat(names(search(SearchFilter.of("example.com")))).containsExactly("Alan Turing");
         }
 
         @Test
         void theSearchIgnoresCase() {
-            assertThat(names(search(UserFilter.of("lovelace"))))
-                    .isEqualTo(names(search(UserFilter.of("LOVELACE"))));
+            assertThat(names(search(SearchFilter.of("lovelace"))))
+                    .isEqualTo(names(search(SearchFilter.of("LOVELACE"))));
         }
 
         @Test
         void theSearchDoesNotMatchFromTheMiddleOfAWord() {
-            assertThat(search(UserFilter.of("urin"))).isEmpty();
-            assertThat(search(UserFilter.of("velace"))).isEmpty();
+            assertThat(search(SearchFilter.of("urin"))).isEmpty();
+            assertThat(search(SearchFilter.of("velace"))).isEmpty();
         }
 
         @Test
         void everyWordTypedMustMatch() {
-            assertThat(names(search(UserFilter.of("ada love")))).containsExactly("Ada Lovelace");
-            assertThat(search(UserFilter.of("ada hopper"))).isEmpty();
+            assertThat(names(search(SearchFilter.of("ada love")))).containsExactly("Ada Lovelace");
+            assertThat(search(SearchFilter.of("ada hopper"))).isEmpty();
         }
 
         @Test
         void anAbsentSearchMatchesEveryone() {
-            assertThat(search(UserFilter.of(null))).hasSize(3);
-            assertThat(search(UserFilter.of("  "))).hasSize(3);
+            assertThat(search(SearchFilter.of(null))).hasSize(3);
+            assertThat(search(SearchFilter.of("  "))).hasSize(3);
         }
 
         @Test
@@ -119,7 +119,7 @@ class UserSearchRepositoryIT {
         void anAbsentFilterMatchesBoth() {
             deactivate("alan@example.com");
 
-            assertThat(search(UserFilter.of(null))).hasSize(3);
+            assertThat(search(SearchFilter.of(null))).hasSize(3);
         }
 
         @Test
@@ -133,7 +133,7 @@ class UserSearchRepositoryIT {
         void aSearchAndAFilterMustBothMatch() {
             deactivate("ada@recurve.local");
 
-            UserFilter both = new UserFilter("recurve.local", Map.of("active", List.of("true")));
+            SearchFilter both = new SearchFilter("recurve.local", Map.of("active", List.of("true")));
 
             assertThat(names(search(both))).containsExactly("Grace Hopper");
         }
@@ -263,7 +263,7 @@ class UserSearchRepositoryIT {
             indexMany(5, "Operator");
             index("Ada Lovelace", "ada@recurve.local");
 
-            Page<UserSummary> found = repository.search(UserFilter.of("Lovelace"),
+            Page<UserSummary> found = repository.search(SearchFilter.of("Lovelace"),
                     PageRequest.of(0, 2, Sort.by("name.keyword")));
 
             assertThat(found.getTotalElements()).isEqualTo(1);
@@ -296,15 +296,15 @@ class UserSearchRepositoryIT {
     }
 
     private Page<UserSummary> page(int number, int size, Sort sort) {
-        return repository.search(UserFilter.of(null), PageRequest.of(number, size, sort));
+        return repository.search(SearchFilter.of(null), PageRequest.of(number, size, sort));
     }
 
-    private Page<UserSummary> search(UserFilter filter) {
+    private Page<UserSummary> search(SearchFilter filter) {
         return repository.search(filter, PageRequest.of(0, 20, Sort.by("name.keyword")));
     }
 
-    private static UserFilter filteredBy(String field, String... values) {
-        return new UserFilter(null, Map.of(field, List.of(values)));
+    private static SearchFilter filteredBy(String field, String... values) {
+        return new SearchFilter(null, Map.of(field, List.of(values)));
     }
 
     private static List<String> names(Page<UserSummary> page) {
@@ -326,7 +326,7 @@ class UserSearchRepositoryIT {
     }
 
     private void deactivate(String email) {
-        UserSummary current = search(UserFilter.of(email)).getContent().getFirst();
+        UserSummary current = search(SearchFilter.of(email)).getContent().getFirst();
         User user = User.create(current.name(), current.email(), "$2a$10$hash", current.permissions(), NOW);
         user.deactivate();
         // Same id, so the document is replaced rather than added.

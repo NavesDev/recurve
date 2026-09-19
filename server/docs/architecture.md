@@ -178,10 +178,10 @@ a stream of everything for rebuilding the index.
 The search repository (`UserSearchRepository`) is a class over
 `ElasticsearchOperations` with the same narrow spirit: `save`, `saveAll`,
 `search`, `indexExists`, `recreateIndex`, `refresh`. No single-document
-delete; an index is only ever rebuilt whole. A dedicated class
-(`UserSearchQueries`) turns the feature's filter into a query, the way a
-`Specifications` class would. Never business logic; never calls an
-entity's business method.
+delete; an index is only ever rebuilt whole. The query itself comes from
+`shared/repository/SearchQueries`, the same for every feature: the
+repository only names the fields its free text matches against. Never
+business logic; never calls an entity's business method.
 
 The index's settings and mapping live outside Java, in
 `src/main/resources/search/`, next to the schema in `db/migration`. They
@@ -257,8 +257,10 @@ response. No rules, no `@PreAuthorize` (already on the service).
 - Request: `record` with Bean Validation, `toCommand()` method.
 - Response: `record` with a `from(entity)` factory. Reads entity getters,
   never calls a business method.
-- Listing: query params become a filter `record` + `Pageable`; response
-  as `PageResponse<T>`.
+- Listing: the query params go, as they arrived, to
+  `shared/controller/ListingRequests`, which hands back a `SearchFilter`
+  and a `Pageable`; the controller only names the feature's default sort
+  field. Response as `PageResponse<T>`.
 
 ## Authorization
 
@@ -480,6 +482,20 @@ Sorting always appends `id` as a secondary key so paging stays stable
 (FR-07.4). That key is ascending whichever way the caller asked: it is
 there to keep pages from overlapping, not to follow the request, so two
 directions over a fully tied field return the same order.
+
+The contract is implemented once, in `shared/`, and a feature adds a
+listing without restating any of it:
+
+| Piece | Where | The feature supplies |
+|---|---|---|
+| parsing `q`, `filter`, `page`, `size`, `sort`; the page bounds; the `id` key | `shared/controller/ListingRequests` | its default sort field |
+| what a listing asks for | `shared/service/SearchFilter` | — |
+| the Elasticsearch query | `shared/repository/SearchQueries` | the fields `q` matches against |
+| what can be filtered and sorted on | `src/main/resources/search/<feature>-mapping.json` | the mapping |
+
+The page limit is `recurve.listing.max-page-size` (default 100), one
+value for every listing: it is the API's rule about how much a response
+may carry, not a property of any index.
 
 ## Tests
 

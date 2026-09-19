@@ -13,6 +13,7 @@ import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import com.navesdev.recurve.shared.service.SearchFilter;
 import com.navesdev.recurve.user.domain.User;
 import com.navesdev.recurve.user.domain.UserSummary;
 import com.navesdev.recurve.user.domain.exception.EmailAlreadyInUseException;
@@ -96,7 +97,7 @@ public class UserService {
     /** FR-06.1 and FR-07: search and filter, then sort, then paginate — all in the index. */
     @PreAuthorize("hasAuthority('VIEW_USERS')")
     @Transactional(readOnly = true)
-    public Page<UserSummary> search(UserFilter filter, Pageable pageable) {
+    public Page<UserSummary> search(SearchFilter filter, Pageable pageable) {
         return searchRepository.search(filter, pageable);
     }
 

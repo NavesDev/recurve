@@ -18,6 +18,9 @@ spring:
     open-in-view: false
 
 recurve:
+  listing:
+    # FR-07: the largest page any listing serves. Same for every endpoint.
+    max-page-size: 100
   search:
     # Prepended to every index name. Empty in development; the integration
     # tests set "test-" so they never touch a development index.

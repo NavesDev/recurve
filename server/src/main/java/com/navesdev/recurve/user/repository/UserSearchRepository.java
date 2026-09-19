@@ -1,6 +1,7 @@
 package com.navesdev.recurve.user.repository;
 
 import java.util.Collection;
+import java.util.List;
 
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
@@ -13,7 +14,8 @@ import org.springframework.data.elasticsearch.core.SearchHits;
 import org.springframework.stereotype.Repository;
 
 import com.navesdev.recurve.user.domain.UserSummary;
-import com.navesdev.recurve.user.service.UserFilter;
+import com.navesdev.recurve.shared.repository.SearchQueries;
+import com.navesdev.recurve.shared.service.SearchFilter;
 
 import lombok.RequiredArgsConstructor;
 
@@ -33,6 +35,9 @@ import lombok.RequiredArgsConstructor;
 @RequiredArgsConstructor
 public class UserSearchRepository {
 
+    /** FR-06.1: what {@code q} matches against — the prefix-analyzed text fields of the mapping. */
+    private static final List<String> SEARCHED_FIELDS = List.of("name", "email");
+
     private final ElasticsearchOperations operations;
 
     public UserSummary save(UserSummary summary) {
@@ -44,9 +49,9 @@ public class UserSearchRepository {
         operations.withRefreshPolicy(RefreshPolicy.NONE).save(summaries);
     }
 
-    public Page<UserSummary> search(UserFilter filter, Pageable pageable) {
+    public Page<UserSummary> search(SearchFilter filter, Pageable pageable) {
         SearchHits<UserSummary> hits = operations.search(
-                UserSearchQueries.from(filter, pageable), UserSummary.class);
+                SearchQueries.from(filter, pageable, SEARCHED_FIELDS), UserSummary.class);
 
         return SearchHitSupport.searchPageFor(hits, pageable).map(SearchHit::getContent);
     }

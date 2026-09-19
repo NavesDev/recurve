@@ -11,16 +11,14 @@ import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
+import com.navesdev.recurve.shared.controller.Listing;
 import com.navesdev.recurve.shared.controller.ListingRequest;
-import com.navesdev.recurve.shared.controller.ListingRequests;
 import com.navesdev.recurve.shared.controller.PageResponse;
 import com.navesdev.recurve.user.domain.User;
 import com.navesdev.recurve.user.service.UserService;
 
-import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 
@@ -38,7 +36,6 @@ public class UserController {
     private static final String DEFAULT_SORT = "name.keyword";
 
     private final UserService service;
-    private final ListingRequests listings;
 
     @PostMapping
     public ResponseEntity<UserResponse> create(@Valid @RequestBody CreateUserRequest request) {
@@ -86,16 +83,7 @@ public class UserController {
      * and a filter on a field it does not know matches nothing.
      */
     @GetMapping
-    public PageResponse<UserResponse> search(
-            @RequestParam(required = false) String q,
-            HttpServletRequest request,
-            @RequestParam(defaultValue = "0") int page,
-            @RequestParam(defaultValue = "20") int size,
-            @RequestParam(required = false) String sort) {
-
-        ListingRequest listing = listings.parse(
-                q, request.getParameterValues("filter"), page, size, sort, DEFAULT_SORT);
-
+    public PageResponse<UserResponse> search(@Listing(defaultSort = DEFAULT_SORT) ListingRequest listing) {
         return PageResponse.from(service.search(listing.filter(), listing.pageable()), UserResponse::from);
     }
 }

@@ -79,13 +79,7 @@ paths:
         - $ref: '#/components/parameters/filter'
         - $ref: '#/components/parameters/page'
         - $ref: '#/components/parameters/size'
-        - name: sort
-          in: query
-          description: '`field[:asc|desc]`, comma-separated; no direction means `asc`.'
-          schema:
-            type: string
-            default: name.keyword
-          example: active:desc,createdAt:desc
+        - $ref: '#/components/parameters/sort'
       responses:
         '200':
           description: One page of operators.
@@ -307,6 +301,14 @@ components:
         minimum: 1
         maximum: 100
         default: 20
+
+    sort:
+      name: sort
+      in: query
+      description: '`field[:asc|desc]`, comma-separated; no direction means `asc`. Defaults to the listing''s own field.'
+      schema:
+        type: string
+      example: active:desc,createdAt:desc
 
   responses:
 

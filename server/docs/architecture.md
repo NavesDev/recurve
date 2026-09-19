@@ -81,8 +81,8 @@ feature so the dependency rule reads the same way:
 
 ```
 shared/
-├── config/               # SecurityConfig, ClockConfig
-├── controller/           # GlobalExceptionHandler, ApiError, PageResponse
+├── config/               # SecurityConfig, WebConfig, DocsConfig, ClockConfig
+├── controller/           # GlobalExceptionHandler, ApiError, PageResponse, the listing argument
 ├── repository/           # BaseRepository, the contract every repository follows
 └── domain/exception/     # the abstract exception bases
 ```
@@ -270,10 +270,18 @@ the request gets here).
 - Request: `record` with Bean Validation, `toCommand()` method.
 - Response: `record` with a `from(entity)` factory. Reads entity getters,
   never calls a business method.
-- Listing: the query params go, as they arrived, to
-  `shared/controller/ListingRequests`, which hands back a `SearchFilter`
-  and a `Pageable`; the controller only names the feature's default sort
-  field. Response as `PageResponse<T>`.
+- Listing: one argument, `@Listing(defaultSort = "...") ListingRequest`,
+  resolved by `shared/controller/ListingRequestResolver` from the five
+  query parameters every listing shares; the controller only names the
+  feature's default sort field and gets back a `SearchFilter` and a
+  `Pageable`. Response as `PageResponse<T>`.
+
+  ```java
+  @GetMapping
+  public PageResponse<PlanResponse> search(@Listing(defaultSort = "name.keyword") ListingRequest listing) {
+      return PageResponse.from(service.search(listing.filter(), listing.pageable()), PlanResponse::from);
+  }
+  ```
 
 ## Authorization
 
@@ -510,7 +518,9 @@ listing without restating any of it:
 
 | Piece | Where | The feature supplies |
 |---|---|---|
-| parsing `q`, `filter`, `page`, `size`, `sort`; the page bounds; the `id` key | `shared/controller/ListingRequests` | its default sort field |
+| the controller argument | `shared/controller/Listing`, `ListingRequestResolver` | `@Listing(defaultSort = ...)` on a `ListingRequest` parameter |
+| parsing `q`, `filter`, `page`, `size`, `sort`; the page bounds; the `id` key | `shared/controller/ListingRequests` | — |
+| the OpenAPI parameters | `components/parameters/{q,filter,page,size,sort}` in `docs/openapi.yaml` | five `$ref`s |
 | what a listing asks for | `shared/service/SearchFilter` | — |
 | the Elasticsearch query | `shared/repository/SearchQueries` | the fields `q` matches against |
 | what can be filtered and sorted on | `src/main/resources/search/<feature>-mapping.json` | the mapping |

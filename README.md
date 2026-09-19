@@ -7,7 +7,8 @@ Recurve — a recurring billing and subscription management engine built with Sp
 docker compose up -d          # PostgreSQL (54330) and Elasticsearch (9230)
 cd server
 ./mvnw test                   # unit tests, no server needed
-./mvnw verify                 # unit + integration tests
+./mvnw pmd:check              # lint (server/pmd-ruleset.xml)
+./mvnw verify                 # unit + integration tests + lint
 ./mvnw verify -Pintegration   # integration tests only
 ./mvnw spring-boot:run
 ```

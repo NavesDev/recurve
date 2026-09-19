@@ -65,7 +65,7 @@ public class ListingRequestResolver implements HandlerMethodArgumentResolver {
         try {
             return Integer.parseInt(value.trim());
         } catch (NumberFormatException e) {
-            throw new InvalidRequestException("%s must be an integer, got '%s'".formatted(name, value));
+            throw new InvalidRequestException("%s must be an integer, got '%s'".formatted(name, value), e);
         }
     }
 }

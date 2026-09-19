@@ -7,6 +7,30 @@ spring:
     url: ${DB_URL:jdbc:postgresql://localhost:54330/recurve-database}
     username: ${DB_USER:postgres}
     password: ${DB_PASSWORD:postgres}
+  elasticsearch:
+    uris: ${ES_URL:http://localhost:9230}
+  flyway:
+    enabled: true
+    locations: classpath:db/migration
   jpa:
     hibernate:
-      ddl-auto: update
+      ddl-auto: validate
+    open-in-view: false
+
+recurve:
+  listing:
+    # FR-07: the largest page any listing serves. Same for every endpoint.
+    max-page-size: 100
+  search:
+    # Prepended to every index name. Empty in development; the integration
+    # tests set "test-" so they never touch a development index.
+    index-prefix: ""
+  docs:
+    # Serves the API contract and the Swagger UI at /docs, to anyone. The
+    # contract is only a shape; a call through the UI still needs Basic
+    # Auth. Turn off in production.
+    enabled: ${DOCS_ENABLED:true}
+  bootstrap:
+    admin:
+      email: ${BOOTSTRAP_ADMIN_EMAIL:}
+      password: ${BOOTSTRAP_ADMIN_PASSWORD:}

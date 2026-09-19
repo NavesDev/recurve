@@ -1,0 +1,33 @@
+{
+  "index": {
+    "number_of_shards": 1,
+    "number_of_replicas": 0
+  },
+  "analysis": {
+    "filter": {
+      "word_prefix": {
+        "type": "edge_ngram",
+        "min_gram": 1,
+        "max_gram": 20
+      }
+    },
+    "normalizer": {
+      "lowercase": {
+        "type": "custom",
+        "filter": ["lowercase"]
+      }
+    },
+    "analyzer": {
+      "prefix": {
+        "type": "custom",
+        "tokenizer": "standard",
+        "filter": ["lowercase", "word_prefix"]
+      },
+      "prefix_search": {
+        "type": "custom",
+        "tokenizer": "standard",
+        "filter": ["lowercase"]
+      }
+    }
+  }
+}

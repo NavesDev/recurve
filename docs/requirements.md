@@ -23,6 +23,8 @@ names here are business terms, not code identifiers.
 - FR-01.3 Deactivate an operator without deleting. Inactive operator cannot
   sign in.
 - FR-01.4 List operators and their permissions (see FR-06.1).
+- FR-01.5 Rebuild the operator search index (see FR-06). Requires the
+  `MANAGE_SYSTEM` permission.
 
 ### FR-02 Plans
 
@@ -68,19 +70,33 @@ names here are business terms, not code identifiers.
 
 - FR-05.1 Operator signs in with email and password.
 - FR-05.2 Every operation requires the corresponding permission (see BR-01).
-- FR-05.3 **[open]** Session mechanism (token, session cookie).
+- FR-05.3 Sessionless: every request carries the operator's credentials
+  via HTTP Basic. A token mechanism is deferred until there is a client
+  that needs one.
 
 ### FR-06 Search, filter and sort
 
-Applies to listings. Search is free text, case-insensitive, by substring.
+Applies to listings. Search is free text, case-insensitive, matching the
+start of any word of the searched fields; every word typed must match.
 Filters combine with AND; multiple values of the same filter combine with
-OR. Sort accepts one field and a direction (ascending/descending); a field
-outside the allowed list is a validation error. Every listing is paginated
-(FR-07).
+OR. Sort accepts one field, ascending or descending; the direction is part
+of naming the field rather than a separate choice, so that sorting on more
+than one field stays expressible. A field outside the allowed list is a
+validation error, and so is a filter over a field the listing does not
+offer — neither is an empty result. Every listing is paginated (FR-07).
+
+Filters are named, not positional: a listing offers a set of filterable
+fields and a caller states which of them it wants and with what values.
+Which fields a listing offers is part of that listing's contract.
+
+Listings are served from a search index, kept in step with the database
+on every write and rebuildable from it on request (FR-01.5).
 
 #### FR-06.1 Operators
 
 - Search by name and email.
+- Filter by active/inactive; absent, the filter matches both.
+- Sort by name, email or creation date.
 - Default sort: name ascending.
 
 #### FR-06.2 Plans
@@ -121,7 +137,8 @@ Offset-based.
 
 - BR-01 Permissions per resource: a view permission and a manage
   permission for each of operators, plans, subscribers and payments.
-  Manage implies view.
+  Manage implies view. One more permission, `MANAGE_SYSTEM`, covers
+  operational routines (rebuilding a search index) and implies nothing.
 - BR-02 Operator email is unique. Subscriber email is unique.
 - BR-03 A plan has no price of its own; amount and cycle live in the
   price. A plan may have several active prices, at most one per
@@ -169,14 +186,15 @@ active ──charge fails──► past due ──payment confirmed──► act
   in the server.
 - NFR-03 Configuration via environment variables; no real credential in
   the repository.
-- NFR-04 Operator password stored as a hash. **[open]** algorithm
-  (BCrypt/Argon2).
+- NFR-04 Operator password stored as a BCrypt hash. A password longer
+  than 72 bytes is rejected rather than silently truncated.
 - NFR-05 Timestamps in UTC.
 - NFR-06 Monetary amounts with two decimal places; currency as ISO 4217
   code.
 - NFR-07 Business logic testable without database and without HTTP.
-- NFR-08 **[open]** Schema migrations with Flyway once the model
-  stabilizes; automatic schema update only in development.
+- NFR-08 Schema migrations with Flyway. The migration is the source of
+  truth; the application only validates the mapping against it and never
+  alters the schema on its own.
 - NFR-09 **[open]** Frontend: stack and scope.
 
 ## Out of scope for now

@@ -1,0 +1,26 @@
+# Integration tests run against their own database and their own search
+# indexes, never the development ones: a repository test truncates tables
+# and recreates indexes, and pre-existing data would collide with its
+# fixtures. docker-compose creates the database alongside the development
+# one; the index prefix keeps the search indexes apart on the same node.
+spring:
+  datasource:
+    url: ${TEST_DB_URL:jdbc:postgresql://localhost:54330/recurve-test}
+    username: ${DB_USER:postgres}
+    password: ${DB_PASSWORD:postgres}
+  elasticsearch:
+    uris: ${TEST_ES_URL:http://localhost:9230}
+  flyway:
+    enabled: true
+    clean-disabled: false
+  jpa:
+    hibernate:
+      ddl-auto: validate
+
+recurve:
+  search:
+    index-prefix: test-
+  bootstrap:
+    admin:
+      email: ""
+      password: ""

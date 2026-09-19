@@ -13,7 +13,6 @@ import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.dao.DataAccessResourceFailureException;
-import org.springframework.security.test.context.support.WithMockUser;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 
 import com.navesdev.recurve.user.domain.Permission;
@@ -46,7 +45,6 @@ class UserServiceIT {
     class NeverDiverge {
 
         @Test
-        @WithMockUser(authorities = "MANAGE_USERS")
         void aWriteTheIndexRefusesLeavesNothingInTheDatabase() {
             doThrow(new DataAccessResourceFailureException("search node down"))
                     .when(searchRepository).save(any(UserSummary.class));

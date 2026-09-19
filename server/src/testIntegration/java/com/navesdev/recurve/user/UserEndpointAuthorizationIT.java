@@ -37,9 +37,9 @@ import jakarta.persistence.PersistenceContext;
 
 /**
  * Crosses every layer: real HTTP Basic against the real service, so it
- * covers what a mocked service cannot — that {@code @PreAuthorize} runs,
- * that MANAGE_* implies VIEW_* (BR-01) and that an inactive operator is
- * refused (BR-09).
+ * covers what a mocked service cannot — that the route rules in
+ * {@code SecurityConfig} run, that MANAGE_* implies VIEW_* (BR-01) and
+ * that an inactive operator is refused (BR-09).
  */
 @SpringBootTest
 @AutoConfigureMockMvc
@@ -120,6 +120,23 @@ class UserEndpointAuthorizationIT {
     @Test
     void anOperatorWithoutUserPermissionsIsRefused() throws Exception {
         mvc.perform(get("/api/users").with(basic("outsider@recurve.local")))
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.status").value(403))
+                .andExpect(jsonPath("$.message").value("Access denied"));
+    }
+
+    @Test
+    void theRefusalComesBeforeTheRequestIsEvenRead() throws Exception {
+        // Authorization sits in the filter chain, ahead of body binding: an
+        // operator who may not create a user gets a 403, not a 400 that
+        // would tell them what a valid body looks like.
+        mvc.perform(post("/api/users")
+                .with(basic("viewer@recurve.local"))
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{}"))
+                .andExpect(status().isForbidden());
+
+        mvc.perform(get("/api/users").with(basic("outsider@recurve.local")).param("size", "999"))
                 .andExpect(status().isForbidden());
     }
 

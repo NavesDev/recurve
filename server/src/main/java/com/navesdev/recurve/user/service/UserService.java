@@ -8,7 +8,6 @@ import java.util.stream.Stream;
 
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
-import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -46,7 +45,6 @@ public class UserService {
     private final PasswordEncoder passwordEncoder;
     private final Clock clock;
 
-    @PreAuthorize("hasAuthority('MANAGE_USERS')")
     public User create(CreateUserCommand command) {
         String email = normalize(command.email());
 
@@ -64,7 +62,6 @@ public class UserService {
         return persist(user);
     }
 
-    @PreAuthorize("hasAuthority('MANAGE_USERS')")
     public User update(UpdateUserCommand command) {
         User user = findOrThrow(command.id());
         String email = normalize(command.email());
@@ -81,39 +78,32 @@ public class UserService {
     }
 
     /** FR-01.3: deactivate without deleting. */
-    @PreAuthorize("hasAuthority('MANAGE_USERS')")
     public User deactivate(UUID id) {
         User user = findOrThrow(id);
         user.deactivate();
         return persist(user);
     }
 
-    @PreAuthorize("hasAuthority('VIEW_USERS')")
     @Transactional(readOnly = true)
     public User findById(UUID id) {
         return findOrThrow(id);
     }
 
     /** FR-06.1 and FR-07: search and filter, then sort, then paginate — all in the index. */
-    @PreAuthorize("hasAuthority('VIEW_USERS')")
     @Transactional(readOnly = true)
     public Page<UserSummary> search(SearchFilter filter, Pageable pageable) {
         return searchRepository.search(filter, pageable);
     }
 
-    /** FR-01.5: rebuild the index from the database. Returns how many operators were indexed. */
-    @PreAuthorize("hasAuthority('MANAGE_SYSTEM')")
-    public long reindex() {
-        return reindexInternal();
-    }
-
     /**
-     * Internal, unchecked: {@link UserIndexBootstrap} runs it at startup,
-     * when there is no authenticated operator. Recreating the index rather
-     * than overwriting documents is what drops a document whose operator
-     * no longer exists.
+     * FR-01.5: rebuild the index from the database. Returns how many
+     * operators were indexed. Recreating the index rather than overwriting
+     * documents is what drops a document whose operator no longer exists.
+     * {@link UserIndexBootstrap} runs it at startup, the reindex endpoint
+     * on request; neither needs a permission here — see
+     * {@code SecurityConfig}.
      */
-    long reindexInternal() {
+    public long reindex() {
         searchRepository.recreateIndex();
 
         long indexed = 0;

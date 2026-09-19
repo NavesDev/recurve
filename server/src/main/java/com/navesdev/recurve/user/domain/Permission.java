@@ -24,9 +24,9 @@ public enum Permission {
 
     /**
      * BR-01: manage implies view. Expanding here — once, while building the
-     * principal's authorities — is what lets every {@code @PreAuthorize}
-     * name a single permission instead of repeating the implication at
-     * every read use case.
+     * principal's authorities — is what lets every route rule in
+     * {@code SecurityConfig} name a single permission instead of repeating
+     * the implication at every read route.
      */
     public Set<Permission> expand() {
         return switch (this) {

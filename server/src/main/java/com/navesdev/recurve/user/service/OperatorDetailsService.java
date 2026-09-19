@@ -16,8 +16,7 @@ import lombok.RequiredArgsConstructor;
  * Loads the operator for authentication.
  *
  * <p>Internal by design: it runs inside the authentication filter, before
- * any principal exists, so it carries no {@code @PreAuthorize} — a check
- * here could never pass. Nothing else may call it.
+ * any principal exists. Nothing else may call it.
  */
 @Service
 @RequiredArgsConstructor

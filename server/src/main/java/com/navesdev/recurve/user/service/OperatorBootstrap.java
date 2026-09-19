@@ -28,9 +28,9 @@ import lombok.extern.slf4j.Slf4j;
  * API. Credentials come from the environment (NFR-03) and nothing is
  * created when they are absent.
  *
- * <p>Internal by design, like {@link OperatorDetailsService}: it runs at
- * startup with no authenticated operator, so it talks to the repository
- * rather than to {@link UserService}.
+ * <p>Runs at startup with no authenticated operator. It talks to the
+ * repository rather than to {@link UserService} because it is not a use
+ * case — it seeds the one record that lets the use cases be reached.
  */
 /*
  * After UserIndexBootstrap (1): the index must exist with its mapping

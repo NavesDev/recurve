@@ -26,8 +26,8 @@ import lombok.RequiredArgsConstructor;
 
 /**
  * Converts HTTP into a service call and the result into a response. Holds
- * no rule and no {@code @PreAuthorize} — authorization lives on the
- * service, so the scheduler and cross-feature calls go through it too.
+ * no rule. Which permission each route needs is decided in
+ * {@code SecurityConfig}, before a request reaches here.
  */
 @RestController
 @RequestMapping("/api/users")

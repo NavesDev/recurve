@@ -12,7 +12,8 @@ Principles:
   and other features talk only to the service.
 - Interfaces only where swapping the implementation is plausible: external
   services (payment gateway, email). Repositories are plain Spring Data.
-- Authorization via `@PreAuthorize` on the service.
+- Authorization at the HTTP boundary: one rule per route in
+  `SecurityConfig`. Services carry no check.
 - Two stores. PostgreSQL holds the write model and is the source of
   truth; Elasticsearch holds a read model per listing and serves every
   search, filter, sort and page (FR-06, FR-07). Nothing above the
@@ -212,7 +213,6 @@ quietly stopped matching the data.
 
 Before step 2 the service also:
 
-- Checks authorization (`@PreAuthorize`).
 - Validates rules that depend on the database or on another entity
   (email uniqueness, active price).
 - Fetches from another feature whatever the domain rule needs
@@ -226,7 +226,6 @@ HTTP, hold `if`s for rules that belong in the entity.
 @Transactional
 public class SubscriberService {
 
-    @PreAuthorize("hasAuthority('MANAGE_SUBSCRIBERS')")
     public Subscriber create(CreateSubscriberCommand cmd) {
         if (repository.existsByEmail(cmd.email())) {
             throw new EmailAlreadyInUseException(cmd.email());
@@ -236,7 +235,6 @@ public class SubscriberService {
         return repository.save(subscriber);
     }
 
-    @PreAuthorize("hasAuthority('MANAGE_SUBSCRIBERS')")
     public Subscriber cancel(UUID id) {
         Subscriber subscriber = findOrThrow(id);   // 1
         subscriber.cancel(clock.instant());        // 2
@@ -252,7 +250,8 @@ entity (or `Page<Entity>`).
 ### Presentation (`controller/`)
 
 `@RestController`. Converts HTTP into a service call and the result into a
-response. No rules, no `@PreAuthorize` (already on the service).
+response. No rules, no authorization (decided in `SecurityConfig` before
+the request gets here).
 
 - Request: `record` with Bean Validation, `toCommand()` method.
 - Response: `record` with a `from(entity)` factory. Reads entity getters,
@@ -264,39 +263,43 @@ response. No rules, no `@PreAuthorize` (already on the service).
 
 ## Authorization
 
-Spring Security with method security enabled (`@EnableMethodSecurity`).
+Spring Security, HTTP Basic, and **one rule per route family** in
+`SecurityConfig`:
+
+```java
+.requestMatchers(HttpMethod.POST, "/api/users/reindex").hasAuthority("MANAGE_SYSTEM")
+.requestMatchers(HttpMethod.GET, "/api/users/**").hasAuthority("VIEW_USERS")
+.requestMatchers("/api/users/**").hasAuthority("MANAGE_USERS")
+.anyRequest().authenticated()
+```
 
 - The `User`'s `Permission`s become `GrantedAuthority`s at login.
 - `MANAGE_*` implies `VIEW_*`: resolved when building the principal's
-  authorities, not in the annotation. `@PreAuthorize` always names
-  **one** permission.
-- Annotation on the service, never on the controller. That way the
-  scheduler and cross-feature calls go through the check too.
-- An internal method that must not be checked (called only by another
-  service of the same feature) has no annotation and is documented as
-  internal.
+  authorities, not in the rule. A rule always names **one** permission.
+- Most specific route first; Spring Security takes the first match.
 - An inactive operator (BR-09) is blocked in `UserDetailsService`:
   `enabled=false`.
 
-Because the check lives in a proxy, a call that does not cross the proxy
-is not checked. That is what makes an unannotated internal component
-possible — and what makes an annotation on a self-invoked method silently
-useless. Two components are internal on purpose, both running when there
-is no authenticated operator to check, and both talking to the repository
-rather than to the service:
+Authorization is a question about the **HTTP boundary**: may the operator
+on the other side do this? So it is answered there, and nowhere else.
+The services carry no check, and every other caller — the startup
+bootstraps, the scheduler, one feature calling another — is a plain
+method call. The server acting on its own behalf has no operator, and
+giving it a pretend one (a system `SecurityContext`, an unannotated
+`*Internal()` twin of each use case) would only be working around a check
+that was never about it.
 
-- `UserIndexBootstrap`, which creates the search index at startup and
-  calls the service's unchecked `reindexInternal()`.
-- `OperatorDetailsService`, which runs inside the authentication filter,
-  before a principal exists.
-- `OperatorBootstrap`, which creates the first operator on an empty
-  table. Every write use case demands `MANAGE_USERS`, so without it no
-  operator could ever be created through the API. Its credentials come
-  from the environment and it does nothing when they are absent.
+Deciding in the filter also fixes the order of refusals. It runs before
+any binding, so an operator without the permission gets a 403 before a
+malformed body or an out-of-range `size` could earn a 400 — they learn
+nothing about what a valid request looks like. A denial is handed to the
+same `HandlerExceptionResolver` the controllers use, so the 403 carries
+the `ApiError` body every other error does.
 
-The scheduled job (billing) runs without an operator. Mechanism to be
-decided with FR-04.1: a system `SecurityContext`, or a dedicated
-unannotated service method invoked only by the feature's own scheduler.
+What this gives up: a use case reached through a second entry point (a
+future GraphQL layer, a CLI) is not checked unless that entry point has
+its own rules. That is the right place for them anyway — the question is
+still "may this caller", and only the boundary knows who the caller is.
 
 ## Dependency rule
 
@@ -390,12 +393,13 @@ Security — not the handler — that answers 401. Anything unmapped is a
 
 `POST /api/subscribers`
 
-1. Spring Security authenticates the operator and builds authorities.
+1. Spring Security authenticates the operator, builds authorities and
+   checks the route's rule: `POST /api/subscribers` needs
+   `MANAGE_SUBSCRIBERS`, or it is a 403 here.
 2. `SubscriberController` receives JSON. Bean Validation validates
    `CreateSubscriberRequest`.
 3. `request.toCommand()` produces `CreateSubscriberCommand`.
-4. `SubscriberService.create(command)`: `@PreAuthorize` checks
-   `MANAGE_SUBSCRIBERS`; the service validates email uniqueness, fetches
+4. `SubscriberService.create(command)`: validates email uniqueness, fetches
    the `PlanPrice` via `PlanService`, calls `Subscriber.start(...)`, saves.
 5. `SubscriberResponse.from(subscriber)`. `201`.
 
@@ -534,7 +538,7 @@ Two source roots, so that the unit suite never needs a server:
 | Query builder | test | nothing — the query is inspected as data | what a filter and page turn into |
 | JPA persistence | testIntegration | real database (`@DataJpaTest`) | lookups, custom queries |
 | Search persistence | testIntegration | real node (`@DataElasticsearchTest`) | the listing rules FR-06, FR-07 on the mapped index |
-| Authorization | testIntegration | `@SpringBootTest` + HTTP Basic | `@PreAuthorize` per use case |
+| Authorization | testIntegration | `@SpringBootTest` + HTTP Basic | the route rules in `SecurityConfig` |
 | Fail-fast | testIntegration | `@SpringBootTest`, search repository mocked to fail | the rollback the transaction promises |
 
 Integration tests use their own database (`recurve-test`) and their own

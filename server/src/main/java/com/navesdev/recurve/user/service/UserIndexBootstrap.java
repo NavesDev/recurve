@@ -21,9 +21,10 @@ import lombok.extern.slf4j.Slf4j;
  * application from starting. A listing that silently answered from a
  * missing index would be worse than no application.
  *
- * <p>Internal by design, like {@link OperatorBootstrap}: it runs with no
- * authenticated operator, so it calls the service's unchecked method.
- * Ordered first so that the bootstrap operator finds the index in place.
+ * <p>Runs with no authenticated operator, which needs nothing special:
+ * permissions are checked at the HTTP boundary, and the server rebuilding
+ * its own index is not a request. Ordered first so that the bootstrap
+ * operator finds the index in place.
  */
 @Component
 @Order(1)
@@ -40,7 +41,7 @@ public class UserIndexBootstrap implements ApplicationRunner {
             return;
         }
 
-        long indexed = service.reindexInternal();
+        long indexed = service.reindex();
         log.info("Operator search index created and populated with {} operators", indexed);
     }
 }

@@ -557,9 +557,12 @@ nice: an email is `^[^@\s]+@[^@\s]+$` because that is `UserValidator`'s
 rule, not `format: email`, which promises RFC 5321 and would fail the
 conformance test on a `.local` address the server accepts.
 
-Descriptions stay short. The schema, the limits and the examples carry
-the documentation; a paragraph on an operation is a sign that a rule is
-missing from the schema.
+The document carries no prose beyond the API's own description: the
+schema and its limits are the documentation, and each operation shows one
+example of its success response. A response's `description` is the
+status's reason phrase, there because the format requires one. A
+paragraph on an operation would be a sign that a rule is missing from
+the schema.
 
 ## Tests
 

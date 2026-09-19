@@ -28,7 +28,9 @@ import lombok.Getter;
 /**
  * An operator of the system (FR-01). Mutable entity, but state changes only
  * through a business method — there is no public setter. Time always comes
- * in as a parameter; the entity never reads the clock.
+ * in as a parameter; the entity never reads the clock. Every attribute
+ * goes through {@link UserValidator} on the way in, so an instance that
+ * exists is a valid one.
  */
 @Entity
 @Table(name = "users")
@@ -74,9 +76,9 @@ public class User {
 
         User user = new User();
         user.id = UUID.randomUUID();
-        user.name = requireText(name, "name");
-        user.email = normalizeEmail(email);
-        user.passwordHash = requireText(passwordHash, "passwordHash");
+        user.name = UserValidator.name(name);
+        user.email = UserValidator.email(email);
+        user.passwordHash = UserValidator.passwordHash(passwordHash);
         user.permissions = copyOf(permissions);
         user.active = true;
         user.createdAt = Objects.requireNonNull(now, "now is required");
@@ -84,15 +86,15 @@ public class User {
     }
 
     public void rename(String name) {
-        this.name = requireText(name, "name");
+        this.name = UserValidator.name(name);
     }
 
     public void changeEmail(String email) {
-        this.email = normalizeEmail(email);
+        this.email = UserValidator.email(email);
     }
 
     public void changePassword(String passwordHash) {
-        this.passwordHash = requireText(passwordHash, "passwordHash");
+        this.passwordHash = UserValidator.passwordHash(passwordHash);
     }
 
     public void replacePermissions(Set<Permission> permissions) {
@@ -129,16 +131,5 @@ public class User {
 
     private static Set<Permission> copyOf(Set<Permission> permissions) {
         return permissions == null ? new HashSet<>() : new HashSet<>(permissions);
-    }
-
-    private static String normalizeEmail(String email) {
-        return requireText(email, "email").toLowerCase();
-    }
-
-    private static String requireText(String value, String field) {
-        if (value == null || value.isBlank()) {
-            throw new IllegalArgumentException("%s is required".formatted(field));
-        }
-        return value.trim();
     }
 }

@@ -14,6 +14,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import com.navesdev.recurve.shared.service.SearchFilter;
 import com.navesdev.recurve.user.domain.User;
+import com.navesdev.recurve.user.domain.UserValidator;
 import com.navesdev.recurve.user.domain.UserSummary;
 import com.navesdev.recurve.user.domain.exception.EmailAlreadyInUseException;
 import com.navesdev.recurve.user.domain.exception.UserNotFoundException;
@@ -46,7 +47,7 @@ public class UserService {
     private final Clock clock;
 
     public User create(CreateUserCommand command) {
-        String email = normalize(command.email());
+        String email = UserValidator.email(command.email());
 
         if (repository.existsByEmail(email)) {
             throw new EmailAlreadyInUseException(email);
@@ -64,7 +65,7 @@ public class UserService {
 
     public User update(UpdateUserCommand command) {
         User user = findOrThrow(command.id());
-        String email = normalize(command.email());
+        String email = UserValidator.email(command.email());
 
         if (repository.existsByEmailAndIdNot(email, command.id())) {
             throw new EmailAlreadyInUseException(email);
@@ -136,9 +137,5 @@ public class UserService {
 
     private User findOrThrow(UUID id) {
         return repository.findById(id).orElseThrow(() -> new UserNotFoundException(id));
-    }
-
-    private static String normalize(String email) {
-        return email == null ? null : email.trim().toLowerCase();
     }
 }

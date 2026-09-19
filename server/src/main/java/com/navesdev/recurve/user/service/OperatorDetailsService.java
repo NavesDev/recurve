@@ -8,6 +8,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import com.navesdev.recurve.user.domain.User;
+import com.navesdev.recurve.user.domain.UserValidator;
 import com.navesdev.recurve.user.repository.UserRepository;
 
 import lombok.RequiredArgsConstructor;
@@ -27,7 +28,7 @@ public class OperatorDetailsService implements UserDetailsService {
     @Override
     @Transactional(readOnly = true)
     public UserDetails loadUserByUsername(String email) {
-        User operator = repository.findByEmail(email.trim().toLowerCase())
+        User operator = repository.findByEmail(UserValidator.normalizeEmail(email))
                 .orElseThrow(() -> new UsernameNotFoundException("No operator with email " + email));
 
         return org.springframework.security.core.userdetails.User

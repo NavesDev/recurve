@@ -1,5 +1,6 @@
 package com.navesdev.recurve.user.service;
 
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.argThat;
@@ -22,6 +23,7 @@ import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.test.util.ReflectionTestUtils;
 
 import com.navesdev.recurve.user.domain.Permission;
+import com.navesdev.recurve.user.domain.exception.InvalidUserException;
 import com.navesdev.recurve.user.domain.User;
 import com.navesdev.recurve.user.repository.UserRepository;
 import com.navesdev.recurve.user.repository.UserSearchRepository;
@@ -81,6 +83,17 @@ class OperatorBootstrapTest {
             bootstrap.run(null);
 
             verifyNoInteractions(repository, searchRepository);
+        }
+
+        @Test
+        void aMalformedEmailFromTheEnvironmentFailsStartupInsteadOfBeingStored() {
+            // The bootstrap never passes the API's edge, so the domain is
+            // the only thing standing between a typo and a stored operator.
+            configure("admin", "s3cret-password");
+
+            assertThatThrownBy(() -> bootstrap.run(null)).isInstanceOf(InvalidUserException.class);
+
+            verifyNoInteractions(searchRepository);
         }
     }
 

@@ -10,6 +10,7 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 
+import com.navesdev.recurve.user.domain.exception.InvalidUserException;
 import com.navesdev.recurve.user.domain.exception.UserAlreadyInactiveException;
 
 /** The rules an operator obeys, stated as FR-01 and BR-01/BR-02 state them. */
@@ -30,12 +31,16 @@ class UserTest {
 
         @Test
         void anOperatorMustHaveANameAnEmailAndAPassword() {
+            // The rules are UserValidator's; this shows the entity cannot
+            // be built around them.
             assertThatThrownBy(() -> User.create(" ", "ada@recurve.local", "hash", Set.of(), NOW))
-                    .isInstanceOf(IllegalArgumentException.class);
+                    .isInstanceOf(InvalidUserException.class);
             assertThatThrownBy(() -> User.create("Ada", " ", "hash", Set.of(), NOW))
-                    .isInstanceOf(IllegalArgumentException.class);
+                    .isInstanceOf(InvalidUserException.class);
             assertThatThrownBy(() -> User.create("Ada", "ada@recurve.local", " ", Set.of(), NOW))
-                    .isInstanceOf(IllegalArgumentException.class);
+                    .isInstanceOf(InvalidUserException.class);
+            assertThatThrownBy(() -> User.create("Ada", "not-an-email", "hash", Set.of(), NOW))
+                    .isInstanceOf(InvalidUserException.class);
         }
 
         @Test

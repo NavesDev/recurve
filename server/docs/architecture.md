@@ -104,7 +104,21 @@ Mutable `@Entity`, but mutation only through business methods. No public
 setters.
 
 - Constructor or static factory validates invariants:
-  `User.create(name, email, passwordHash, now)`.
+  `User.create(name, email, passwordHash, now)`. The rules themselves
+  live in a `<Entity>Validator` next to the entity (`UserValidator`):
+  required, bounded by the column, an email that is one, in its
+  canonical form. Every attribute goes through it on creation and on
+  every change, so an entity that exists is a valid one **whoever built
+  it** — the API, the startup bootstrap, a caller not written yet. Bean
+  Validation on the request repeats the same limits for a different
+  reason: the edge answers "what did the caller get wrong", field by
+  field in one 400; the validator answers "can this exist". The request
+  records take their limits from the validator's constants, so the two
+  cannot drift.
+- One canonical form per value that gets compared. An email is trimmed
+  and lower-cased by `UserValidator.normalizeEmail`, and that one method
+  serves the entity, the uniqueness check and the login lookup; no two
+  places can disagree on whether two spellings are the same operator.
 - State transitions are methods with business names: `subscriber.cancel(now)`,
   `subscriber.confirmPayment(interval)`, `plan.deactivate()`.
 - A method throws a business exception when a rule is violated:

@@ -81,11 +81,11 @@ paths:
         - $ref: '#/components/parameters/size'
         - name: sort
           in: query
-          description: One index field, `-` prefix for descending.
+          description: '`field[:asc|desc]`, comma-separated; no direction means `asc`.'
           schema:
             type: string
             default: name.keyword
-          example: -createdAt
+          example: active:desc,createdAt:desc
       responses:
         '200':
           description: One page of operators.

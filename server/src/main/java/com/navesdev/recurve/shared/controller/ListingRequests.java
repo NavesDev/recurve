@@ -69,8 +69,10 @@ public class ListingRequests {
     }
 
     private static Sort sortOf(String sort, String defaultSort) {
-        RequestSort requested = RequestSort.parse(sort, defaultSort);
+        List<Sort.Order> orders = RequestSort.parse(sort, defaultSort).stream()
+                .map(key -> new Sort.Order(key.direction(), key.field()))
+                .toList();
 
-        return Sort.by(requested.direction(), requested.field()).and(STABLE_PAGING);
+        return Sort.by(orders).and(STABLE_PAGING);
     }
 }

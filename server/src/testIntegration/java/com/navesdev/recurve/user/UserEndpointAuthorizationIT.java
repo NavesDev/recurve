@@ -173,7 +173,7 @@ class UserEndpointAuthorizationIT {
                 .with(basic("manager@recurve.local"))
                 .param("q", "recurve.local")
                 .param("filter", "active:true")
-                .param("sort", "-email.keyword")
+                .param("sort", "email.keyword:desc")
                 .param("page", "0")
                 .param("size", "2"))
                 .andExpect(status().isOk())
@@ -207,7 +207,7 @@ class UserEndpointAuthorizationIT {
         @Test
         void aMinusBeforeTheFieldTurnsTheOrderAround() throws Exception {
             List<String> ascending = emailsSortedBy("email.keyword");
-            List<String> descending = emailsSortedBy("-email.keyword");
+            List<String> descending = emailsSortedBy("email.keyword:desc");
 
             assertThat(ascending).isSorted();
             assertThat(descending).containsExactlyElementsOf(ascending.reversed());
@@ -215,7 +215,7 @@ class UserEndpointAuthorizationIT {
 
         @Test
         void theOrderAppliesToWhicheverFieldWasChosen() throws Exception {
-            assertThat(emailsSortedBy("name.keyword")).isNotEqualTo(emailsSortedBy("-name.keyword"));
+            assertThat(emailsSortedBy("name.keyword")).isNotEqualTo(emailsSortedBy("name.keyword:desc"));
         }
 
         @Test
@@ -244,9 +244,21 @@ class UserEndpointAuthorizationIT {
         }
 
         @Test
-        void aMinusWithNoFieldIsAValidationError() throws Exception {
-            mvc.perform(get("/api/users").with(basic("manager@recurve.local")).param("sort", "-"))
+        void aDirectionWithNoFieldIsAValidationError() throws Exception {
+            mvc.perform(get("/api/users").with(basic("manager@recurve.local")).param("sort", ":desc"))
                     .andExpect(status().isBadRequest());
+        }
+
+        @Test
+        void severalKeysSortInOrder() throws Exception {
+            // Every operator is on the same domain, so active:desc puts the
+            // retired one last and the rest follow name.keyword.
+            List<String> emails = emailsSortedBy("active:desc,name.keyword:asc");
+
+            assertThat(emails).last().isEqualTo("retired@recurve.local");
+            assertThat(emails.subList(0, emails.size() - 1))
+                    .containsExactlyElementsOf(emailsSortedBy("name.keyword").stream()
+                            .filter(email -> !email.equals("retired@recurve.local")).toList());
         }
 
         private List<String> emailsSortedBy(String sort) throws Exception {

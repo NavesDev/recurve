@@ -432,10 +432,11 @@ Every listing takes the same query parameters and answers with
 | `filter` | — | repeatable, `field:value` or `field:value1,value2` |
 | `page` | `0` | zero-based page number |
 | `size` | `20` | page size, maximum 100 |
-| `sort` | the feature's default, ascending | one field of the index, named as the index names it, prefixed with `-` for descending |
+| `sort` | the feature's default, ascending | `field[:asc\|desc]`, comma-separated, each field named as the index names it; no direction means `asc` |
 
 ```
-?q=ada&filter=active:true&sort=-email.keyword&page=0&size=20
+?q=ada&filter=active:true&sort=email.keyword:desc&page=0&size=20
+?sort=active:desc,name.keyword:asc
 ?filter=status:ACTIVE,PAST_DUE&filter=plan=<id>
 ```
 
@@ -484,18 +485,20 @@ endpoint signature does not change. `page` and `size` outside their bounds
 are still a 400 from the controller: the limit on `size` is the API's
 rule, not the index's.
 
-A listing sorts on **one** field. Naming more than one — `sort=name,email`
-or a repeated `sort` — reaches Elasticsearch as a field called
-`name,email`, which it has no mapping for, and comes back a 400 rather
-than a silent choice of the first. The syntax leaves room for several
-fields if a requirement ever asks for them.
+`sort` is spelled the way Elasticsearch's own URL spells it
+(`GET /index/_search?sort=createdAt:desc,name.keyword:asc`): the field,
+`:` and a direction, several keys separated by commas, and a key with no
+direction ascending. Since the field names are already the index's own,
+a caller who knows Elasticsearch already knows the whole parameter, and
+there is no translation table to keep. A direction other than `asc` or
+`desc`, or a direction with no field, is a 400 from the controller; a
+field the mapping cannot sort on is a 400 from Elasticsearch, as with
+`filter`.
 
-The direction rides with the field, as JSON:API, Spring Data, OData and
-Elasticsearch each do in their own spelling, rather than travelling in a
-parameter of its own. A separate direction cannot say what it means once
-more than one field is sorted on — `sort=name&sort=createdAt&
-direction=desc` names no answer — so keeping them together leaves
-multi-field sorting open instead of closing it.
+The direction rides with the field rather than travelling in a parameter
+of its own. A separate direction cannot say what it means once more than
+one field is sorted on — `sort=name&sort=createdAt&direction=desc` names
+no answer.
 
 Sorting always appends `id` as a secondary key so paging stays stable
 (FR-07.4). That key is ascending whichever way the caller asked: it is

@@ -75,9 +75,10 @@ public class UserController {
      * FR-06.1 and FR-07. {@code q} searches name and email by word prefix,
      * case-insensitively. {@code filter} is repeatable and written as
      * {@code field:value} or {@code field:value1,value2} — values of one
-     * field combine with OR, separate filters with AND. {@code sort} names
-     * one field of the index, prefixed with {@code -} for descending, and
-     * defaults to {@code name.keyword} ascending.
+     * field combine with OR, separate filters with AND. {@code sort} is
+     * written as Elasticsearch's own URL takes it, {@code field:desc} with
+     * several keys separated by commas, and defaults to {@code name.keyword}
+     * ascending.
      *
      * <p>Field names and values go to Elasticsearch as written. The index
      * mapping decides which fields can be filtered or sorted on; a field it

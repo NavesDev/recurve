@@ -74,22 +74,46 @@ class ListingRequestsTest {
         void theFieldIsPassedThroughAsNamedWithItsDirection() {
             // No translation and no allow-list: the contract names the
             // index's own fields, and the mapping says which ones sort.
-            Sort sort = listings.parse(null, null, 0, 20, "-email.keyword", BY_NAME).pageable().getSort();
+            Sort sort = listings.parse(null, null, 0, 20, "email.keyword:desc", BY_NAME).pageable().getSort();
 
             assertThat(sort.getOrderFor("email.keyword")).isEqualTo(Sort.Order.desc("email.keyword"));
         }
 
         @Test
+        void aKeyWithNoDirectionIsAscendingAsItIsForElasticsearch() {
+            Sort sort = listings.parse(null, null, 0, 20, "email.keyword", BY_NAME).pageable().getSort();
+
+            assertThat(sort.getOrderFor("email.keyword")).isEqualTo(Sort.Order.asc("email.keyword"));
+        }
+
+        @Test
+        void severalKeysKeepTheirOrderAndEachItsDirection() {
+            Sort sort = listings.parse(null, null, 0, 20, "active:desc, name.keyword:ASC", BY_NAME).pageable().getSort();
+
+            assertThat(sort).containsExactly(
+                    Sort.Order.desc("active"), Sort.Order.asc("name.keyword"), Sort.Order.asc("id"));
+        }
+
+        @Test
         void idIsAlwaysTheLastKeyAscendingSoPagesNeverOverlap() {
-            Sort descending = listings.parse(null, null, 0, 20, "-" + BY_NAME, BY_NAME).pageable().getSort();
+            Sort descending = listings.parse(null, null, 0, 20, BY_NAME + ":desc", BY_NAME).pageable().getSort();
 
             assertThat(descending).containsExactly(Sort.Order.desc(BY_NAME), Sort.Order.asc("id"));
         }
 
         @Test
-        void aMinusWithNoFieldIsAValidationError() {
-            assertThatThrownBy(() -> listings.parse(null, null, 0, 20, "-", BY_NAME))
+        void aDirectionWithNoFieldIsAValidationError() {
+            assertThatThrownBy(() -> listings.parse(null, null, 0, 20, ":desc", BY_NAME))
                     .isInstanceOf(InvalidRequestException.class);
+            assertThatThrownBy(() -> listings.parse(null, null, 0, 20, "name.keyword,", BY_NAME))
+                    .isInstanceOf(InvalidRequestException.class);
+        }
+
+        @Test
+        void aDirectionOtherThanAscOrDescIsAValidationError() {
+            assertThatThrownBy(() -> listings.parse(null, null, 0, 20, "name.keyword:down", BY_NAME))
+                    .isInstanceOf(InvalidRequestException.class)
+                    .hasMessageContaining("down");
         }
     }
 

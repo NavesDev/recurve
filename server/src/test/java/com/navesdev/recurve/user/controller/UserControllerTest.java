@@ -188,7 +188,7 @@ class UserControllerTest {
             when(service.search(any(SearchFilter.class), any()))
                     .thenReturn(new PageImpl<>(List.of(), PageRequest.of(0, 20), 0));
 
-            mvc.perform(get("/api/users").param("sort", "-email.keyword"))
+            mvc.perform(get("/api/users").param("sort", "email.keyword:desc"))
                     .andExpect(status().isOk());
 
             verify(service).search(any(), sent.capture());

@@ -165,7 +165,7 @@ class UserContractIT {
         mvc.perform(get("/api/users").with(manager())
                 .param("q", "recurve")
                 .param("filter", "active:true")
-                .param("sort", "-email.keyword")
+                .param("sort", "email.keyword:desc")
                 .param("page", "0")
                 .param("size", "10"))
                 .andExpect(status().isOk())

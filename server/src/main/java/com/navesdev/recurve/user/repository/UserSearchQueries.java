@@ -9,7 +9,6 @@ import org.springframework.data.elasticsearch.client.elc.NativeQuery;
 import org.springframework.data.elasticsearch.client.elc.NativeQueryBuilder;
 
 import com.navesdev.recurve.user.service.UserFilter;
-import com.navesdev.recurve.user.service.UserFilterField;
 
 import co.elastic.clients.elasticsearch._types.FieldValue;
 import co.elastic.clients.elasticsearch._types.SortOptions;
@@ -21,9 +20,9 @@ import co.elastic.clients.elasticsearch._types.query_dsl.TextQueryType;
 
 /**
  * Turns a listing filter and page into an Elasticsearch query (FR-06,
- * FR-07). Knows no business rule: which fields may be filtered or sorted
- * is decided by the allow-lists in the service, and the values arrive
- * already validated.
+ * FR-07). It carries field names and values through as they arrived:
+ * whether a field may be filtered or sorted on, and whether a value fits
+ * its type, is decided by the index mapping and answered by Elasticsearch.
  *
  * <p>The search is a {@code multi_match} over the prefix-analyzed
  * {@code name} and {@code email} (see {@code search/users-settings.json}):
@@ -44,12 +43,11 @@ public final class UserSearchQueries {
             bool.must(matchesText(filter.text().trim()));
         }
 
-        for (UserFilterField field : filter.criteria().keySet()) {
-            List<String> values = filter.valuesOf(field);
+        filter.criteria().forEach((field, values) -> {
             if (!values.isEmpty()) {
                 bool.filter(matches(field, values));
             }
-        }
+        });
 
         NativeQueryBuilder query = NativeQuery.builder()
                 .withQuery(Query.of(q -> q.bool(bool.build())))
@@ -73,35 +71,31 @@ public final class UserSearchQueries {
                 .operator(Operator.And)));
     }
 
-    /** FR-06: several values of one field combine with OR — one terms clause. */
-    private static Query matches(UserFilterField field, List<String> values) {
-        List<FieldValue> terms = switch (field) {
-            case ACTIVE -> values.stream()
-                    .map(Boolean::parseBoolean)
-                    .distinct()
-                    .map(active -> FieldValue.of(active.booleanValue()))
-                    .toList();
-        };
+    /**
+     * FR-06: several values of one field combine with OR — one terms clause.
+     * Values travel as strings; Elasticsearch parses them against the
+     * field's mapped type and rejects what does not fit.
+     */
+    private static Query matches(String field, List<String> values) {
+        List<FieldValue> terms = values.stream()
+                .distinct()
+                .map(FieldValue::of)
+                .toList();
 
         return Query.of(query -> query.terms(t -> t
-                .field(field.field())
+                .field(field)
                 .terms(v -> v.value(terms))));
     }
 
     /**
-     * A text field is sorted on its {@code .keyword} copy; every other
-     * field on itself. The order of keys is kept: the last one is the
-     * fixed secondary key that makes paging stable (FR-07.4).
+     * Sort keys as named by the caller, in order: the last one is the fixed
+     * secondary key that makes paging stable (FR-07.4).
      */
     private static List<SortOptions> sortOf(Sort sort) {
         return sort.stream()
                 .map(order -> SortOptions.of(options -> options.field(field -> field
-                        .field(sortField(order.getProperty()))
+                        .field(order.getProperty())
                         .order(order.isAscending() ? SortOrder.Asc : SortOrder.Desc))))
                 .toList();
-    }
-
-    private static String sortField(String property) {
-        return SEARCHED_FIELDS.contains(property) ? property + ".keyword" : property;
     }
 }

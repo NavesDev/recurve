@@ -1,9 +1,7 @@
 package com.navesdev.recurve.user.controller;
 
 import java.net.URI;
-import java.util.EnumMap;
 import java.util.List;
-import java.util.Map;
 import java.util.UUID;
 
 import org.springframework.data.domain.Page;
@@ -28,9 +26,7 @@ import com.navesdev.recurve.shared.controller.RequestSort;
 import com.navesdev.recurve.user.domain.User;
 import com.navesdev.recurve.user.domain.UserSummary;
 import com.navesdev.recurve.user.service.UserFilter;
-import com.navesdev.recurve.user.service.UserFilterField;
 import com.navesdev.recurve.user.service.UserService;
-import com.navesdev.recurve.user.service.UserSortField;
 
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
@@ -47,6 +43,9 @@ import lombok.RequiredArgsConstructor;
 public class UserController {
 
     private static final int MAX_PAGE_SIZE = 100;
+
+    /** Text fields sort on their keyword copy; the contract names it as the index does. */
+    private static final String DEFAULT_SORT = "name.keyword";
 
     private final UserService service;
 
@@ -86,8 +85,13 @@ public class UserController {
      * case-insensitively. {@code filter} is repeatable and written as
      * {@code field:value} or {@code field:value1,value2} — values of one
      * field combine with OR, separate filters with AND. {@code sort} names
-     * one allowed field, prefixed with {@code -} for descending, and
-     * defaults to name ascending.
+     * one field of the index, prefixed with {@code -} for descending, and
+     * defaults to {@code name.keyword} ascending.
+     *
+     * <p>Field names and values go to Elasticsearch as written. The index
+     * mapping decides which fields can be filtered or sorted on; a field it
+     * closes comes back as a 400 through {@code GlobalExceptionHandler},
+     * and a filter on a field it does not know matches nothing.
      */
     @GetMapping
     public PageResponse<UserResponse> search(
@@ -106,27 +110,8 @@ public class UserController {
         return PageResponse.from(found, UserResponse::from);
     }
 
-    /**
-     * Maps the repeatable filter parameter onto the use case's allow-list.
-     * A field the listing does not offer is a validation error, not an
-     * empty result — a silent empty page would read as "nobody matches".
-     */
     private static UserFilter filterOf(String text, String[] filters) {
-        Map<UserFilterField, List<String>> criteria = new EnumMap<>(UserFilterField.class);
-
-        RequestFilters.parse(filters == null ? List.of() : List.of(filters)).forEach((field, values) -> {
-            UserFilterField allowed = UserFilterField.from(field)
-                    .orElseThrow(() -> new InvalidRequestException(
-                            "filter must be one of: " + UserFilterField.allowed()));
-            try {
-                allowed.validate(values);
-            } catch (IllegalArgumentException e) {
-                throw new InvalidRequestException(e.getMessage());
-            }
-            criteria.put(allowed, values);
-        });
-
-        return new UserFilter(text, criteria);
+        return new UserFilter(text, RequestFilters.parse(filters == null ? List.of() : List.of(filters)));
     }
 
     private static int validPage(int page) {
@@ -144,17 +129,12 @@ public class UserController {
     }
 
     private static Sort sortOf(String sort) {
-        RequestSort requested = RequestSort.parse(sort, UserSortField.defaultField().property());
-
-        UserSortField field = UserSortField.from(requested.field())
-                .orElseThrow(() -> new InvalidRequestException(
-                        "sort must be one of: " + UserSortField.allowed()
-                                + ", optionally prefixed with - for descending"));
+        RequestSort requested = RequestSort.parse(sort, DEFAULT_SORT);
 
         // FR-07.4: a fixed secondary key keeps the ordering stable, so an
         // operator never repeats or vanishes between pages. It stays
         // ascending whichever way the caller asked for: it is there to keep
         // pages from overlapping, not to follow the request.
-        return Sort.by(requested.direction(), field.property()).and(Sort.by(Sort.Direction.ASC, "id"));
+        return Sort.by(requested.direction(), requested.field()).and(Sort.by(Sort.Direction.ASC, "id"));
     }
 }

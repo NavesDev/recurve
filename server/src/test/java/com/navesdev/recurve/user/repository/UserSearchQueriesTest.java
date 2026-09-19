@@ -13,7 +13,6 @@ import org.springframework.data.domain.Sort;
 import org.springframework.data.elasticsearch.client.elc.NativeQuery;
 
 import com.navesdev.recurve.user.service.UserFilter;
-import com.navesdev.recurve.user.service.UserFilterField;
 
 import co.elastic.clients.elasticsearch._types.SortOrder;
 import co.elastic.clients.elasticsearch._types.query_dsl.BoolQuery;
@@ -26,7 +25,7 @@ import co.elastic.clients.elasticsearch._types.query_dsl.Operator;
  */
 class UserSearchQueriesTest {
 
-    private static final PageRequest FIRST_PAGE = PageRequest.of(0, 20, Sort.by("name"));
+    private static final PageRequest FIRST_PAGE = PageRequest.of(0, 20, Sort.by("name.keyword"));
 
     @Nested
     @DisplayName("FR-06.1 search by name and email")
@@ -58,12 +57,22 @@ class UserSearchQueriesTest {
         }
 
         @Test
-        void aFilterBecomesATermsClauseOverItsField() {
+        void aFilterBecomesATermsClauseOverItsFieldWithTheValueAsWritten() {
+            // The value is not parsed here: Elasticsearch reads it against
+            // the field's mapped type, and rejects what does not fit.
             var terms = bool(activeIn("true")).filter().getFirst().terms();
 
             assertThat(terms.field()).isEqualTo("active");
             assertThat(terms.terms().value()).singleElement()
-                    .satisfies(value -> assertThat(value.booleanValue()).isTrue());
+                    .satisfies(value -> assertThat(value.stringValue()).isEqualTo("true"));
+        }
+
+        @Test
+        void aFieldTheListingDoesNotKnowIsPassedThroughForTheMappingToJudge() {
+            var terms = bool(new UserFilter(null, Map.of("permissions", List.of("MANAGE_SYSTEM"))))
+                    .filter().getFirst().terms();
+
+            assertThat(terms.field()).isEqualTo("permissions");
         }
 
         @Test
@@ -75,8 +84,7 @@ class UserSearchQueriesTest {
 
         @Test
         void aSearchAndAFilterAreBothRequired() {
-            BoolQuery both = bool(new UserFilter("ada",
-                    Map.of(UserFilterField.ACTIVE, List.of("true"))));
+            BoolQuery both = bool(new UserFilter("ada", Map.of("active", List.of("true"))));
 
             assertThat(both.must()).hasSize(1);
             assertThat(both.filter()).hasSize(1);
@@ -88,20 +96,14 @@ class UserSearchQueriesTest {
     class SortingAndPaging {
 
         @Test
-        void textFieldsAreSortedOnTheirKeywordCopy() {
+        void theSortFieldIsSentAsNamedWithItsDirection() {
+            // No translation: the contract names the index's own fields, so
+            // a text field is sorted on its keyword copy by asking for it.
             var sorts = UserSearchQueries.from(UserFilter.of(null),
-                    PageRequest.of(0, 20, Sort.by(Sort.Direction.DESC, "email"))).getSortOptions();
+                    PageRequest.of(0, 20, Sort.by(Sort.Direction.DESC, "email.keyword"))).getSortOptions();
 
             assertThat(sorts.getFirst().field().field()).isEqualTo("email.keyword");
             assertThat(sorts.getFirst().field().order()).isEqualTo(SortOrder.Desc);
-        }
-
-        @Test
-        void theCreationDateIsSortedAsItself() {
-            var sorts = UserSearchQueries.from(UserFilter.of(null),
-                    PageRequest.of(0, 20, Sort.by("createdAt"))).getSortOptions();
-
-            assertThat(sorts.getFirst().field().field()).isEqualTo("createdAt");
         }
 
         @Test
@@ -109,7 +111,7 @@ class UserSearchQueriesTest {
             // FR-07.4: the controller appends id ascending; the query must
             // keep it after the field the caller chose.
             var sorts = UserSearchQueries.from(UserFilter.of(null),
-                    PageRequest.of(0, 20, Sort.by(Sort.Direction.DESC, "name").and(Sort.by("id"))))
+                    PageRequest.of(0, 20, Sort.by(Sort.Direction.DESC, "name.keyword").and(Sort.by("id"))))
                     .getSortOptions();
 
             assertThat(sorts).hasSize(2);
@@ -126,7 +128,7 @@ class UserSearchQueriesTest {
 
         @Test
         void thePageIsCarriedWithoutItsSortSoItIsNotAppliedTwice() {
-            NativeQuery query = UserSearchQueries.from(UserFilter.of(null), PageRequest.of(3, 10, Sort.by("name")));
+            NativeQuery query = UserSearchQueries.from(UserFilter.of(null), PageRequest.of(3, 10, Sort.by("name.keyword")));
 
             assertThat(query.getPageable().getPageNumber()).isEqualTo(3);
             assertThat(query.getPageable().getPageSize()).isEqualTo(10);
@@ -139,6 +141,6 @@ class UserSearchQueriesTest {
     }
 
     private static UserFilter activeIn(String... values) {
-        return new UserFilter(null, Map.of(UserFilterField.ACTIVE, List.of(values)));
+        return new UserFilter(null, Map.of("active", List.of(values)));
     }
 }

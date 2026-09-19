@@ -4,6 +4,7 @@ import java.time.Clock;
 import java.util.List;
 
 import org.springframework.dao.DataAccessResourceFailureException;
+import org.springframework.data.elasticsearch.UncategorizedElasticsearchException;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.AccessDeniedException;
@@ -14,6 +15,9 @@ import org.springframework.web.bind.annotation.RestControllerAdvice;
 import com.navesdev.recurve.shared.domain.exception.BusinessRuleException;
 import com.navesdev.recurve.shared.domain.exception.ExternalServiceException;
 import com.navesdev.recurve.shared.domain.exception.NotFoundException;
+
+import co.elastic.clients.elasticsearch._types.ElasticsearchException;
+import co.elastic.clients.elasticsearch._types.ErrorCause;
 
 import lombok.RequiredArgsConstructor;
 
@@ -56,6 +60,31 @@ public class GlobalExceptionHandler {
     @ExceptionHandler(DataAccessResourceFailureException.class)
     public ResponseEntity<ApiError> handleStoreUnavailable(DataAccessResourceFailureException e) {
         return respond(HttpStatus.SERVICE_UNAVAILABLE, "A backing service is unavailable");
+    }
+
+    /**
+     * A search Elasticsearch refuses is a bad request, and its reason is
+     * the client's to read: the index mapping is what says which fields
+     * can be filtered or sorted on, so the refusal is the validation. Any
+     * other status is the store's failure, not the caller's.
+     */
+    @ExceptionHandler(UncategorizedElasticsearchException.class)
+    public ResponseEntity<ApiError> handleSearchRefused(UncategorizedElasticsearchException e) {
+        if (e.getStatusCode() != null && e.getStatusCode() == HttpStatus.BAD_REQUEST.value()) {
+            return respond(HttpStatus.BAD_REQUEST, reasonOf(e));
+        }
+        return respond(HttpStatus.BAD_GATEWAY, "The search engine failed to answer");
+    }
+
+    /** The innermost cause names the field; the outer one only says a query failed. */
+    private static String reasonOf(UncategorizedElasticsearchException e) {
+        if (e.getCause() instanceof ElasticsearchException es && es.error() != null) {
+            ErrorCause cause = es.error().rootCause().isEmpty() ? es.error() : es.error().rootCause().getFirst();
+            if (cause.reason() != null) {
+                return cause.reason();
+            }
+        }
+        return "The search engine refused the request";
     }
 
     @ExceptionHandler(MethodArgumentNotValidException.class)

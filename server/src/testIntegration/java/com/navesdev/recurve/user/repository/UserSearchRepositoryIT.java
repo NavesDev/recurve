@@ -1,6 +1,9 @@
 package com.navesdev.recurve.user.repository;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.assertj.core.api.Assertions.catchThrowable;
+import static org.assertj.core.api.InstanceOfAssertFactories.type;
 
 import java.time.Instant;
 import java.util.ArrayList;
@@ -9,6 +12,7 @@ import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
 
+import org.assertj.core.api.ThrowableAssert.ThrowingCallable;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
@@ -19,12 +23,14 @@ import org.springframework.context.annotation.Import;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Sort;
+import org.springframework.data.elasticsearch.UncategorizedElasticsearchException;
 
 import com.navesdev.recurve.user.domain.Permission;
 import com.navesdev.recurve.user.domain.User;
 import com.navesdev.recurve.user.domain.UserSummary;
 import com.navesdev.recurve.user.service.UserFilter;
-import com.navesdev.recurve.user.service.UserFilterField;
+
+import co.elastic.clients.elasticsearch._types.ElasticsearchException;
 
 /**
  * The listing rules (FR-06, FR-07) against a real Elasticsearch, on the
@@ -105,8 +111,8 @@ class UserSearchRepositoryIT {
         void filteringSeparatesActiveFromInactiveOperators() {
             deactivate("alan@example.com");
 
-            assertThat(search(filteredBy("true"))).hasSize(2);
-            assertThat(search(filteredBy("false"))).hasSize(1);
+            assertThat(search(filteredBy("active", "true"))).hasSize(2);
+            assertThat(search(filteredBy("active", "false"))).hasSize(1);
         }
 
         @Test
@@ -120,15 +126,14 @@ class UserSearchRepositoryIT {
         void severalValuesOfOneFilterMatchAnyOfThem() {
             deactivate("alan@example.com");
 
-            assertThat(search(filteredBy("true", "false"))).hasSize(3);
+            assertThat(search(filteredBy("active", "true", "false"))).hasSize(3);
         }
 
         @Test
         void aSearchAndAFilterMustBothMatch() {
             deactivate("ada@recurve.local");
 
-            UserFilter both = new UserFilter("recurve.local",
-                    Map.of(UserFilterField.ACTIVE, List.of("true")));
+            UserFilter both = new UserFilter("recurve.local", Map.of("active", List.of("true")));
 
             assertThat(names(search(both))).containsExactly("Grace Hopper");
         }
@@ -147,13 +152,13 @@ class UserSearchRepositoryIT {
 
         @Test
         void byNameIgnoresCase() {
-            assertThat(names(page(0, 10, Sort.by("name"))))
+            assertThat(names(page(0, 10, Sort.by("name.keyword"))))
                     .containsExactly("Ada Lovelace", "bob Builder", "Carol Danvers");
         }
 
         @Test
         void byEmailDescending() {
-            assertThat(page(0, 10, Sort.by(Sort.Direction.DESC, "email")).map(UserSummary::email))
+            assertThat(page(0, 10, Sort.by(Sort.Direction.DESC, "email.keyword")).map(UserSummary::email))
                     .containsExactly("zed@recurve.local", "mid@recurve.local", "ada@recurve.local");
         }
 
@@ -167,6 +172,78 @@ class UserSearchRepositoryIT {
         }
     }
 
+    /**
+     * What the mapping in {@code search/users-mapping.json} opens and
+     * closes. Only name and email carry an inverted index; the rest is
+     * reachable through doc values where a listing needs it, and
+     * permissions is closed altogether. Elasticsearch is the one that
+     * says no, with a 400 the API passes on.
+     */
+    @Nested
+    @DisplayName("The index mapping decides what can be filtered and sorted on")
+    class MappingPolicy {
+
+        @BeforeEach
+        void index() {
+            UserSearchRepositoryIT.this.index("Ada Lovelace", "ada@recurve.local");
+        }
+
+        @Test
+        void aFilterOnAClosedFieldIsRefused() {
+            assertThat(refusalOf(() -> search(filteredBy("permissions", "VIEW_USERS")))).contains("permissions");
+        }
+
+        @Test
+        void aSortOnAClosedFieldIsRefused() {
+            assertThat(refusalOf(() -> page(0, 10, Sort.by("permissions")))).contains("permissions");
+        }
+
+        @Test
+        void aSortOnAFieldTheIndexDoesNotHaveIsRefused() {
+            assertThat(refusalOf(() -> page(0, 10, Sort.by("passwordHash")))).contains("passwordHash");
+        }
+
+        @Test
+        void aSortOnATextFieldItselfIsRefusedOnlyItsKeywordCopySorts() {
+            assertThat(refusalOf(() -> page(0, 10, Sort.by("name")))).contains("[name]");
+
+            assertThat(page(0, 10, Sort.by("name.keyword"))).hasSize(1);
+        }
+
+        @Test
+        void aValueTheFieldCannotMeanIsRefused() {
+            assertThat(refusalOf(() -> search(filteredBy("active", "maybe")))).contains("maybe");
+        }
+
+        @Test
+        void aFilterOnAFieldTheIndexDoesNotHaveMatchesNothing() {
+            // Accepted as is: "filtered by nothing, found nothing", not an
+            // oracle — no value of an unmapped field can match a document.
+            assertThat(search(filteredBy("passwordHash", "$2a$10$x"))).isEmpty();
+        }
+
+        @Test
+        void aRefusalCarriesTheStatusTheApiTranslatesToBadRequest() {
+            assertThatThrownBy(() -> page(0, 10, Sort.by("permissions")))
+                    .asInstanceOf(type(UncategorizedElasticsearchException.class))
+                    .extracting(UncategorizedElasticsearchException::getStatusCode)
+                    .isEqualTo(400);
+        }
+
+        /**
+         * The reason Elasticsearch gives, read the way {@code
+         * GlobalExceptionHandler} reads it: from the innermost cause, which
+         * is the one that names the field. The outer message only says a
+         * search phase failed.
+         */
+        private static String refusalOf(ThrowingCallable search) {
+            Throwable thrown = catchThrowable(search);
+            assertThat(thrown).isInstanceOf(UncategorizedElasticsearchException.class);
+            ElasticsearchException es = (ElasticsearchException) thrown.getCause();
+            return es.error().rootCause().getFirst().reason();
+        }
+    }
+
     @Nested
     @DisplayName("FR-07 pagination")
     class Pagination {
@@ -175,7 +252,7 @@ class UserSearchRepositoryIT {
         void theTotalCountsEveryMatchNotJustThePage() {
             indexMany(5, "Operator");
 
-            Page<UserSummary> firstPage = page(0, 2, Sort.by("name"));
+            Page<UserSummary> firstPage = page(0, 2, Sort.by("name.keyword"));
 
             assertThat(firstPage.getContent()).hasSize(2);
             assertThat(firstPage.getTotalElements()).isEqualTo(5);
@@ -187,7 +264,7 @@ class UserSearchRepositoryIT {
             index("Ada Lovelace", "ada@recurve.local");
 
             Page<UserSummary> found = repository.search(UserFilter.of("Lovelace"),
-                    PageRequest.of(0, 2, Sort.by("name")));
+                    PageRequest.of(0, 2, Sort.by("name.keyword")));
 
             assertThat(found.getTotalElements()).isEqualTo(1);
         }
@@ -196,7 +273,7 @@ class UserSearchRepositoryIT {
         void aPageBeyondTheEndIsEmptyButStillReportsTheTotal() {
             indexMany(3, "Operator");
 
-            Page<UserSummary> beyond = page(50, 20, Sort.by("name"));
+            Page<UserSummary> beyond = page(50, 20, Sort.by("name.keyword"));
 
             assertThat(beyond.getContent()).isEmpty();
             assertThat(beyond.getTotalElements()).isEqualTo(3);
@@ -209,7 +286,7 @@ class UserSearchRepositoryIT {
             indexMany(5, "Same Name");
 
             List<UUID> seen = new ArrayList<>();
-            Sort byTiedField = Sort.by("name").ascending().and(Sort.by("id").ascending());
+            Sort byTiedField = Sort.by("name.keyword").ascending().and(Sort.by("id").ascending());
             for (int number = 0; number < 3; number++) {
                 page(number, 2, byTiedField).forEach(operator -> seen.add(operator.id()));
             }
@@ -223,11 +300,11 @@ class UserSearchRepositoryIT {
     }
 
     private Page<UserSummary> search(UserFilter filter) {
-        return repository.search(filter, PageRequest.of(0, 20, Sort.by("name")));
+        return repository.search(filter, PageRequest.of(0, 20, Sort.by("name.keyword")));
     }
 
-    private static UserFilter filteredBy(String... active) {
-        return new UserFilter(null, Map.of(UserFilterField.ACTIVE, List.of(active)));
+    private static UserFilter filteredBy(String field, String... values) {
+        return new UserFilter(null, Map.of(field, List.of(values)));
     }
 
     private static List<String> names(Page<UserSummary> page) {

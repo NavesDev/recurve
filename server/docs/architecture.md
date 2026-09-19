@@ -411,10 +411,10 @@ Every listing takes the same query parameters and answers with
 | `filter` | — | repeatable, `field:value` or `field:value1,value2` |
 | `page` | `0` | zero-based page number |
 | `size` | `20` | page size, maximum 100 |
-| `sort` | the feature's default, ascending | one field from the feature's allow-list, prefixed with `-` for descending |
+| `sort` | the feature's default, ascending | one field of the index, named as the index names it, prefixed with `-` for descending |
 
 ```
-?q=ada&filter=active:true&sort=-email&page=0&size=20
+?q=ada&filter=active:true&sort=-email.keyword&page=0&size=20
 ?filter=status:ACTIVE,PAST_DUE&filter=plan=<id>
 ```
 
@@ -430,25 +430,44 @@ negation and OR across fields is a public surface nobody specified, it
 ties the API to the persistence model, and it makes a good error message
 hard to produce.
 
-Both `filter` and `sort` name their fields against an **allow-list**, an
-enum in the feature's `service/`. The allow-list is part of the use case,
-not of the controller, and without it a client could filter or sort over
-any mapped column — `passwordHash` included — and turn the listing into
-an oracle. A field outside the list is a 400, never an empty page: an
-empty page reads as "nobody matches", which is a different and false
-answer.
+`filter` and `sort` name **the index's own fields**, and the **index
+mapping is the allow-list**. Nothing in Java vets a field name or a
+value: the controller parses the syntax, the query builder passes field
+and value through, and Elasticsearch answers. The mapping in
+`search/<feature>-mapping.json` is where the decision is made, per field:
 
-Adding a filter is a constant in that enum plus a case in the feature's
-search queries. The endpoint signature does not change. A `page`, `size`,
-`sort` or `filter` outside what is allowed is a 400, never a silent
-fallback to the default.
+| Field | Mapping | Can be |
+|---|---|---|
+| `name`, `email` | `text` with a prefix analyzer, plus a `.keyword` copy | searched by `q`; sorted on `name.keyword` / `email.keyword` |
+| `active`, `createdAt`, `id` | `index: false`, doc values on | filtered and sorted (doc values serve both; the two cannot be split) |
+| `permissions` | `index: false, doc_values: false` | nothing — returned in the document, never queried |
+| anything else | not mapped | nothing |
+
+What is not in the read model (`UserSummary`) is not in the index at all,
+so `passwordHash` cannot be asked about. What is in the index but closed
+by the mapping is refused by Elasticsearch with a 400 whose reason names
+the field; `GlobalExceptionHandler` passes that status and reason on, so
+the refusal *is* the validation. A value the field cannot hold
+(`active:maybe`) is refused the same way. Sorting a `text` field itself is
+refused too — the contract names `name.keyword` because that is the field
+that sorts, and hiding it behind `name` would tie the API to a translation
+table the mapping already holds.
+
+One consequence is accepted: a filter on a field the index does not know
+matches nothing, and comes back as an empty page rather than a 400. No
+value of an unmapped field can match a document, so it is not an oracle;
+it is "filtered by nothing, found nothing".
+
+Adding a filterable or sortable field is a line in the mapping. The
+endpoint signature does not change. `page` and `size` outside their bounds
+are still a 400 from the controller: the limit on `size` is the API's
+rule, not the index's.
 
 A listing sorts on **one** field. Naming more than one — `sort=name,email`
-or a repeated `sort` — is a 400, not a silent choice of the first: quietly
-dropping the rest would answer a question the caller did not ask, and
-nothing in the response would say so. The syntax leaves room for several
-fields if a requirement ever asks for them; the allow-list is what would
-have to change, not the parameter.
+or a repeated `sort` — reaches Elasticsearch as a field called
+`name,email`, which it has no mapping for, and comes back a 400 rather
+than a silent choice of the first. The syntax leaves room for several
+fields if a requirement ever asks for them.
 
 The direction rides with the field, as JSON:API, Spring Data, OData and
 Elasticsearch each do in their own spelling, rather than travelling in a

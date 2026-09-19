@@ -1,5 +1,6 @@
 package com.navesdev.recurve.user.controller;
 
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
@@ -19,6 +20,7 @@ import java.util.Set;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
+import org.mockito.ArgumentCaptor;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.TestConfiguration;
 import org.springframework.boot.webmvc.test.autoconfigure.WebMvcTest;
@@ -27,6 +29,9 @@ import org.springframework.context.annotation.Import;
 import org.springframework.dao.DataAccessResourceFailureException;
 import org.springframework.data.domain.PageImpl;
 import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Sort;
+import org.springframework.data.elasticsearch.UncategorizedElasticsearchException;
 import org.springframework.http.MediaType;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
@@ -38,6 +43,10 @@ import com.navesdev.recurve.user.domain.UserSummary;
 import com.navesdev.recurve.user.service.CreateUserCommand;
 import com.navesdev.recurve.user.service.UserFilter;
 import com.navesdev.recurve.user.service.UserService;
+
+import co.elastic.clients.elasticsearch._types.ElasticsearchException;
+import co.elastic.clients.elasticsearch._types.ErrorCause;
+import co.elastic.clients.elasticsearch._types.ErrorResponse;
 
 /**
  * What the API promises a client: the shape of a page, what counts as a
@@ -180,42 +189,54 @@ class UserControllerTest {
         }
 
         @Test
-        void sortingByAFieldOutsideTheAllowedListIsAValidationError() throws Exception {
-            mvc.perform(get("/api/users").param("sort", "passwordHash"))
-                    .andExpect(status().isBadRequest());
-
-            verify(service, never()).search(any(), any());
-        }
-
-        @Test
-        void aDescendingSortOverAnAllowedFieldIsAccepted() throws Exception {
+        void theSortIsPassedThroughAsNamedWithIdAppendedForStablePaging() throws Exception {
+            // The contract names the index's own fields (name.keyword, not
+            // name): nothing here translates or vets them. FR-07.4: id is
+            // always the second key, ascending whichever way the caller asked.
+            ArgumentCaptor<Pageable> sent = ArgumentCaptor.forClass(Pageable.class);
             when(service.search(any(UserFilter.class), any()))
                     .thenReturn(new PageImpl<>(List.of(), PageRequest.of(0, 20), 0));
 
-            mvc.perform(get("/api/users").param("sort", "-email"))
+            mvc.perform(get("/api/users").param("sort", "-email.keyword"))
                     .andExpect(status().isOk());
+
+            verify(service).search(any(), sent.capture());
+            assertThat(sent.getValue().getSort()).containsExactly(
+                    Sort.Order.desc("email.keyword"), Sort.Order.asc("id"));
         }
 
         @Test
-        void namingMoreThanOneFieldIsAValidationErrorNotASilentChoiceOfOne() throws Exception {
-            // A listing sorts on one field (FR-06). Quietly honouring the
-            // first and dropping the rest would answer a question nobody
-            // asked, and the caller would never learn it happened.
-            mvc.perform(get("/api/users").param("sort", "name,email"))
-                    .andExpect(status().isBadRequest());
+        void anAbsentSortIsByNameAscending() throws Exception {
+            ArgumentCaptor<Pageable> sent = ArgumentCaptor.forClass(Pageable.class);
+            when(service.search(any(UserFilter.class), any()))
+                    .thenReturn(new PageImpl<>(List.of(), PageRequest.of(0, 20), 0));
 
-            mvc.perform(get("/api/users").param("sort", "name").param("sort", "email"))
-                    .andExpect(status().isBadRequest());
+            mvc.perform(get("/api/users")).andExpect(status().isOk());
 
-            verify(service, never()).search(any(), any());
+            verify(service).search(any(), sent.capture());
+            assertThat(sent.getValue().getSort().getOrderFor("name.keyword")).isNotNull();
         }
 
         @Test
-        void aDescendingSortOverAForbiddenFieldIsStillAValidationError() throws Exception {
-            mvc.perform(get("/api/users").param("sort", "-passwordHash"))
-                    .andExpect(status().isBadRequest());
+        void aSortTheIndexRefusesIsABadRequestWithTheReasonElasticsearchGave() throws Exception {
+            // The mapping decides what can be sorted on; a refusal from the
+            // engine is the validation, and its reason names the field.
+            when(service.search(any(UserFilter.class), any()))
+                    .thenThrow(refusedBy("No mapping found for [passwordHash] in order to sort on"));
 
-            verify(service, never()).search(any(), any());
+            mvc.perform(get("/api/users").param("sort", "passwordHash"))
+                    .andExpect(status().isBadRequest())
+                    .andExpect(jsonPath("$.message").value(
+                            org.hamcrest.Matchers.containsString("passwordHash")));
+        }
+
+        @Test
+        void anyOtherFailureOfTheSearchEngineIsNotBlamedOnTheCaller() throws Exception {
+            when(service.search(any(UserFilter.class), any()))
+                    .thenThrow(new UncategorizedElasticsearchException("boom", 500, null, null));
+
+            mvc.perform(get("/api/users"))
+                    .andExpect(status().isBadGateway());
         }
     }
 
@@ -236,8 +257,7 @@ class UserControllerTest {
         void severalValuesOfOneFieldTravelTogetherInOneFilter() throws Exception {
             // A comma separates values inside one criterion; it must not be
             // mistaken for a separator between criteria.
-            org.mockito.ArgumentCaptor<UserFilter> sent =
-                    org.mockito.ArgumentCaptor.forClass(UserFilter.class);
+            ArgumentCaptor<UserFilter> sent = ArgumentCaptor.forClass(UserFilter.class);
             when(service.search(any(UserFilter.class), any()))
                     .thenReturn(new PageImpl<>(List.of(), PageRequest.of(0, 20), 0));
 
@@ -245,10 +265,7 @@ class UserControllerTest {
                     .andExpect(status().isOk());
 
             verify(service).search(sent.capture(), any());
-            org.assertj.core.api.Assertions
-                    .assertThat(sent.getValue().valuesOf(
-                            com.navesdev.recurve.user.service.UserFilterField.ACTIVE))
-                    .containsExactly("true", "false");
+            assertThat(sent.getValue().valuesOf("active")).containsExactly("true", "false");
         }
 
         @Test
@@ -263,21 +280,40 @@ class UserControllerTest {
         }
 
         @Test
-        void aFieldTheListingDoesNotOfferIsAValidationErrorNotAnEmptyPage() throws Exception {
-            mvc.perform(get("/api/users").param("filter", "passwordHash:$2a$10$x"))
-                    .andExpect(status().isBadRequest())
-                    .andExpect(jsonPath("$.message").value(
-                            org.hamcrest.Matchers.containsString("filter must be one of")));
+        void aFilterFieldIsPassedThroughForTheIndexMappingToJudge() throws Exception {
+            // Nothing here knows which fields exist: the mapping closes what
+            // must stay closed, and a field it does not know matches nothing.
+            ArgumentCaptor<UserFilter> sent = ArgumentCaptor.forClass(UserFilter.class);
+            when(service.search(any(UserFilter.class), any()))
+                    .thenReturn(new PageImpl<>(List.of(), PageRequest.of(0, 20), 0));
 
-            verify(service, never()).search(any(), any());
+            mvc.perform(get("/api/users").param("filter", "permissions:MANAGE_SYSTEM"))
+                    .andExpect(status().isOk());
+
+            verify(service).search(sent.capture(), any());
+            assertThat(sent.getValue().valuesOf("permissions")).containsExactly("MANAGE_SYSTEM");
         }
 
         @Test
-        void aValueTheFieldCannotMeanIsAValidationError() throws Exception {
-            mvc.perform(get("/api/users").param("filter", "active:maybe"))
-                    .andExpect(status().isBadRequest());
+        void aFilterTheIndexRefusesIsABadRequestWithTheReasonElasticsearchGave() throws Exception {
+            when(service.search(any(UserFilter.class), any()))
+                    .thenThrow(refusedBy("Cannot search on field [permissions] since it is not indexed nor has doc values."));
 
-            verify(service, never()).search(any(), any());
+            mvc.perform(get("/api/users").param("filter", "permissions:MANAGE_SYSTEM"))
+                    .andExpect(status().isBadRequest())
+                    .andExpect(jsonPath("$.message").value(
+                            org.hamcrest.Matchers.containsString("permissions")));
+        }
+
+        @Test
+        void aValueTheFieldCannotMeanIsRefusedByTheIndexNotHere() throws Exception {
+            when(service.search(any(UserFilter.class), any()))
+                    .thenThrow(refusedBy("Failed to parse value [maybe] as only [true] or [false] are allowed."));
+
+            mvc.perform(get("/api/users").param("filter", "active:maybe"))
+                    .andExpect(status().isBadRequest())
+                    .andExpect(jsonPath("$.message").value(
+                            org.hamcrest.Matchers.containsString("maybe")));
         }
 
         @Test
@@ -287,6 +323,17 @@ class UserControllerTest {
 
             verify(service, never()).search(any(), any());
         }
+    }
+
+    /** What Spring Data raises when Elasticsearch answers a search with 400. */
+    private static UncategorizedElasticsearchException refusedBy(String reason) {
+        ErrorResponse response = ErrorResponse.of(r -> r
+                .status(400)
+                .error(e -> e.type("search_phase_execution_exception")
+                        .reason("all shards failed")
+                        .rootCause(ErrorCause.of(c -> c.type("query_shard_exception").reason(reason)))));
+        return new UncategorizedElasticsearchException(
+                "Elasticsearch exception", 400, null, new ElasticsearchException("search", response));
     }
 
     private static org.springframework.test.web.servlet.RequestBuilder register(String body) {

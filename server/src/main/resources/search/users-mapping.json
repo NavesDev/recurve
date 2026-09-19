@@ -1,6 +1,6 @@
 {
   "properties": {
-    "id": { "type": "keyword" },
+    "id": { "type": "keyword", "index": false },
     "name": {
       "type": "text",
       "analyzer": "prefix",
@@ -17,8 +17,8 @@
         "keyword": { "type": "keyword", "normalizer": "lowercase" }
       }
     },
-    "permissions": { "type": "keyword" },
-    "active": { "type": "boolean" },
-    "createdAt": { "type": "date", "format": "date_time" }
+    "permissions": { "type": "keyword", "index": false, "doc_values": false },
+    "active": { "type": "boolean", "index": false },
+    "createdAt": { "type": "date", "format": "date_time", "index": false }
   }
 }

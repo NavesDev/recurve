@@ -149,7 +149,7 @@ class UserEndpointAuthorizationIT {
                 .with(basic("manager@recurve.local"))
                 .param("q", "recurve.local")
                 .param("filter", "active:true")
-                .param("sort", "-email")
+                .param("sort", "-email.keyword")
                 .param("page", "0")
                 .param("size", "2"))
                 .andExpect(status().isOk())
@@ -182,8 +182,8 @@ class UserEndpointAuthorizationIT {
 
         @Test
         void aMinusBeforeTheFieldTurnsTheOrderAround() throws Exception {
-            List<String> ascending = emailsSortedBy("email");
-            List<String> descending = emailsSortedBy("-email");
+            List<String> ascending = emailsSortedBy("email.keyword");
+            List<String> descending = emailsSortedBy("-email.keyword");
 
             assertThat(ascending).isSorted();
             assertThat(descending).containsExactlyElementsOf(ascending.reversed());
@@ -191,17 +191,32 @@ class UserEndpointAuthorizationIT {
 
         @Test
         void theOrderAppliesToWhicheverFieldWasChosen() throws Exception {
-            assertThat(emailsSortedBy("name")).isNotEqualTo(emailsSortedBy("-name"));
+            assertThat(emailsSortedBy("name.keyword")).isNotEqualTo(emailsSortedBy("-name.keyword"));
         }
 
         @Test
         void aFieldWithNoMinusComesBackAscending() throws Exception {
-            assertThat(emailsSortedBy("email")).isSorted();
+            assertThat(emailsSortedBy("email.keyword")).isSorted();
         }
 
         @Test
         void aListingWithNoSortComesBackByNameAscending() throws Exception {
-            assertThat(emailsSortedBy(null)).containsExactlyElementsOf(emailsSortedBy("name"));
+            assertThat(emailsSortedBy(null)).containsExactlyElementsOf(emailsSortedBy("name.keyword"));
+        }
+
+        @Test
+        void aFieldTheIndexRefusesIsABadRequestThatNamesIt() throws Exception {
+            // The mapping is the allow-list: nothing before Elasticsearch
+            // vets the field, and its refusal comes back with its reason.
+            mvc.perform(get("/api/users").with(basic("manager@recurve.local")).param("sort", "permissions"))
+                    .andExpect(status().isBadRequest())
+                    .andExpect(jsonPath("$.message").value(
+                            org.hamcrest.Matchers.containsString("permissions")));
+
+            mvc.perform(get("/api/users").with(basic("manager@recurve.local")).param("sort", "email"))
+                    .andExpect(status().isBadRequest())
+                    .andExpect(jsonPath("$.message").value(
+                            org.hamcrest.Matchers.containsString("keyword")));
         }
 
         @Test

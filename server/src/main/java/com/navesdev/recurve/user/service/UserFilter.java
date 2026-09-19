@@ -5,13 +5,15 @@ import java.util.Map;
 
 /**
  * A listing filter (FR-06.1): free text over name and email, plus zero or
- * more criteria drawn from {@link UserFilterField}.
+ * more criteria, each a field name and the values it may take.
  *
- * <p>Criteria arrive already validated against the allow-list, so the
- * persistence layer can map them without asking whether they are legal.
- * Values of one field combine with OR, fields with AND.
+ * <p>The field names are passed through as the client wrote them. Which
+ * fields can actually be filtered on is decided by the index mapping
+ * ({@code search/users-mapping.json}), not here: a field the mapping
+ * closes is refused by Elasticsearch, and one it does not know matches
+ * nothing. Values of one field combine with OR, fields with AND.
  */
-public record UserFilter(String text, Map<UserFilterField, List<String>> criteria) {
+public record UserFilter(String text, Map<String, List<String>> criteria) {
 
     public UserFilter {
         criteria = criteria == null ? Map.of() : Map.copyOf(criteria);
@@ -21,7 +23,7 @@ public record UserFilter(String text, Map<UserFilterField, List<String>> criteri
         return new UserFilter(text, Map.of());
     }
 
-    public List<String> valuesOf(UserFilterField field) {
+    public List<String> valuesOf(String field) {
         return criteria.getOrDefault(field, List.of());
     }
 }

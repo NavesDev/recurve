@@ -1,10 +1,10 @@
 package com.navesdev.recurve.shared.config;
 
 import org.springframework.beans.factory.annotation.Qualifier;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.http.HttpMethod;
-import org.springframework.security.config.Customizer;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.http.SessionCreationPolicy;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
@@ -35,21 +35,35 @@ public class SecurityConfig {
     @Bean
     public SecurityFilterChain securityFilterChain(
             HttpSecurity http,
-            @Qualifier("handlerExceptionResolver") HandlerExceptionResolver exceptionResolver) throws Exception {
+            @Qualifier("handlerExceptionResolver") HandlerExceptionResolver exceptionResolver,
+            @Value("${recurve.docs.enabled:false}") boolean docsEnabled) throws Exception {
         return http
                 // No cookie-based session to protect, and no browser form posts.
                 .csrf(csrf -> csrf.disable())
                 .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
-                .authorizeHttpRequests(requests -> requests
+                .authorizeHttpRequests(requests -> {
+                    // The contract is a shape, not data, and the Swagger UI has to
+                    // fetch it before any credential exists. Only opened while
+                    // DocsConfig serves it: off, the path answers 401 like any other.
+                    if (docsEnabled) {
+                        requests.requestMatchers(DocsConfig.PATH, DocsConfig.PATH + "/**").permitAll();
+                    }
+                    requests
                         // FR-01.5: rebuilding an index is a system operation.
                         .requestMatchers(HttpMethod.POST, "/api/users/reindex").hasAuthority("MANAGE_SYSTEM")
                         .requestMatchers(HttpMethod.GET, "/api/users/**").hasAuthority("VIEW_USERS")
                         .requestMatchers("/api/users/**").hasAuthority("MANAGE_USERS")
-                        .anyRequest().authenticated())
-                .httpBasic(Customizer.withDefaults())
-                // A denial happens in the filter, before any controller; hand it
-                // to the same resolver the controllers use so the 403 carries the
-                // ApiError body every other error does.
+                        .anyRequest().authenticated();
+                })
+                // A refusal happens in the filter, before any controller; hand it
+                // to the same resolver the controllers use so the 401 and the 403
+                // carry the ApiError body every other error does. The default
+                // entry point would answer a 401 with a Basic challenge, which
+                // makes a browser pop its own login dialog over any client
+                // (the Swagger UI included). An API client sends credentials
+                // on every request; it needs no invitation.
+                .httpBasic(basic -> basic.authenticationEntryPoint(
+                        (request, response, denied) -> exceptionResolver.resolveException(request, response, null, denied)))
                 .exceptionHandling(handling -> handling.accessDeniedHandler(
                         (request, response, denied) -> exceptionResolver.resolveException(request, response, null, denied)))
                 .build();

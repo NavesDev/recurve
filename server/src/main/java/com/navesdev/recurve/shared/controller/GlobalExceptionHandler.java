@@ -8,6 +8,7 @@ import org.springframework.data.elasticsearch.UncategorizedElasticsearchExceptio
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.AccessDeniedException;
+import org.springframework.security.core.AuthenticationException;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
@@ -46,6 +47,12 @@ public class GlobalExceptionHandler {
     @ExceptionHandler(InvalidRequestException.class)
     public ResponseEntity<ApiError> handleInvalidRequest(InvalidRequestException e) {
         return respond(HttpStatus.BAD_REQUEST, e.getMessage());
+    }
+
+    /** No, wrong or refused credentials (BR-09); the message never says which. */
+    @ExceptionHandler(AuthenticationException.class)
+    public ResponseEntity<ApiError> handleUnauthenticated(AuthenticationException e) {
+        return respond(HttpStatus.UNAUTHORIZED, "Authentication required");
     }
 
     @ExceptionHandler(AccessDeniedException.class)

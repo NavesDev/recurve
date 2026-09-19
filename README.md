@@ -14,3 +14,7 @@ cd server
 
 The operator search index is created at first start and rebuilt on
 demand with `POST /api/users/reindex` (requires `MANAGE_SYSTEM`).
+
+The API contract (`server/src/main/resources/docs/openapi.yaml`) and a
+Swagger UI over it are served at http://localhost:8080/docs. Set
+`DOCS_ENABLED=false` to turn them off.

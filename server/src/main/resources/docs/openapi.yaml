@@ -1,0 +1,543 @@
+openapi: 3.0.3
+
+# Written by hand; nothing is generated from or into the code. The tests
+# under src/test and src/testIntegration keep the two aligned.
+
+info:
+  title: Recurve API
+  version: 0.0.1
+  description: |
+    Recurring billing and subscription management engine.
+    HTTP Basic on every request; one permission per route, `MANAGE_*` implies `VIEW_*`.
+
+servers:
+  - url: /
+
+tags:
+  - name: Users
+    description: Operators of the system. Never deleted, only deactivated.
+
+security:
+  - basicAuth: []
+
+paths:
+
+  /api/users:
+
+    post:
+      tags: [Users]
+      operationId: createUser
+      summary: Register an operator
+      description: Requires `MANAGE_USERS`. Email is trimmed and lower-cased.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateUserRequest'
+      responses:
+        '201':
+          description: Created. `Location` points at the operator.
+          headers:
+            Location:
+              schema:
+                type: string
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UserResponse'
+        '400':
+          $ref: '#/components/responses/ValidationFailed'
+        '401':
+          $ref: '#/components/responses/Unauthenticated'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '422':
+          description: Email already in use, or a value the domain refuses.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiError'
+              example:
+                status: 422
+                error: Unprocessable Entity
+                message: Email ada@recurve.local is already in use
+                timestamp: '2026-01-15T10:00:00Z'
+                fieldErrors: []
+        '503':
+          $ref: '#/components/responses/StoreUnavailable'
+
+    get:
+      tags: [Users]
+      operationId: searchUsers
+      summary: List operators
+      description: |
+        Requires `VIEW_USERS`. `q` matches `name` and `email`.
+        Filter on `active`, `createdAt`, `id`; sort on those or `name.keyword`, `email.keyword`.
+      parameters:
+        - $ref: '#/components/parameters/q'
+        - $ref: '#/components/parameters/filter'
+        - $ref: '#/components/parameters/page'
+        - $ref: '#/components/parameters/size'
+        - name: sort
+          in: query
+          description: One index field, `-` prefix for descending.
+          schema:
+            type: string
+            default: name.keyword
+          example: -createdAt
+      responses:
+        '200':
+          description: One page of operators.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UserPage'
+        '400':
+          description: Paging out of bounds, malformed `filter` or `sort`, or a field the index refuses.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiError'
+              examples:
+                sizeOutOfRange:
+                  value:
+                    status: 400
+                    error: Bad Request
+                    message: size must be between 1 and 100
+                    timestamp: '2026-01-15T10:00:00Z'
+                    fieldErrors: []
+                closedField:
+                  value:
+                    status: 400
+                    error: Bad Request
+                    message: Cannot search on field [permissions] since it is not indexed.
+                    timestamp: '2026-01-15T10:00:00Z'
+                    fieldErrors: []
+        '401':
+          $ref: '#/components/responses/Unauthenticated'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '502':
+          description: The search engine failed to answer.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiError'
+              example:
+                status: 502
+                error: Bad Gateway
+                message: The search engine failed to answer
+                timestamp: '2026-01-15T10:00:00Z'
+                fieldErrors: []
+        '503':
+          $ref: '#/components/responses/StoreUnavailable'
+
+  /api/users/{id}:
+
+    parameters:
+      - $ref: '#/components/parameters/userId'
+
+    get:
+      tags: [Users]
+      operationId: findUser
+      summary: Get an operator
+      description: Requires `VIEW_USERS`.
+      responses:
+        '200':
+          description: The operator.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UserResponse'
+        '401':
+          $ref: '#/components/responses/Unauthenticated'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/UserNotFound'
+        '503':
+          $ref: '#/components/responses/StoreUnavailable'
+
+    put:
+      tags: [Users]
+      operationId: updateUser
+      summary: Update an operator
+      description: Requires `MANAGE_USERS`. Replaces name, email and the whole permission set.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateUserRequest'
+      responses:
+        '200':
+          description: The updated operator.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UserResponse'
+        '400':
+          $ref: '#/components/responses/ValidationFailed'
+        '401':
+          $ref: '#/components/responses/Unauthenticated'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/UserNotFound'
+        '422':
+          description: Email already in use.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiError'
+              example:
+                status: 422
+                error: Unprocessable Entity
+                message: Email ada@recurve.local is already in use
+                timestamp: '2026-01-15T10:00:00Z'
+                fieldErrors: []
+        '503':
+          $ref: '#/components/responses/StoreUnavailable'
+
+    delete:
+      tags: [Users]
+      operationId: deactivateUser
+      summary: Deactivate an operator
+      description: Requires `MANAGE_USERS`. The record is kept; sign-in is blocked.
+      responses:
+        '200':
+          description: The operator, now inactive.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UserResponse'
+        '401':
+          $ref: '#/components/responses/Unauthenticated'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/UserNotFound'
+        '422':
+          description: Already inactive.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiError'
+              example:
+                status: 422
+                error: Unprocessable Entity
+                message: Operator 9d1b2b2e-6c8e-4c53-9d5a-1f2a3b4c5d6e is already inactive
+                timestamp: '2026-01-15T10:00:00Z'
+                fieldErrors: []
+        '503':
+          $ref: '#/components/responses/StoreUnavailable'
+
+  /api/users/reindex:
+
+    post:
+      tags: [Users]
+      operationId: reindexUsers
+      summary: Rebuild the operator search index
+      description: Requires `MANAGE_SYSTEM`.
+      responses:
+        '200':
+          description: Rebuilt.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ReindexResponse'
+        '401':
+          $ref: '#/components/responses/Unauthenticated'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '503':
+          $ref: '#/components/responses/StoreUnavailable'
+
+components:
+
+  securitySchemes:
+    basicAuth:
+      type: http
+      scheme: basic
+
+  parameters:
+
+    userId:
+      name: id
+      in: path
+      required: true
+      schema:
+        type: string
+        format: uuid
+
+    q:
+      name: q
+      in: query
+      description: Free text; prefix of any word, case-insensitive, every word must match.
+      schema:
+        type: string
+
+    filter:
+      name: filter
+      in: query
+      description: Repeatable. `field:value` or `field:v1,v2`; values OR, filters AND.
+      style: form
+      explode: true
+      schema:
+        type: array
+        items:
+          type: string
+          pattern: '^[^:]+:.+$'
+      example: ['active:true']
+
+    page:
+      name: page
+      in: query
+      schema:
+        type: integer
+        minimum: 0
+        default: 0
+
+    size:
+      name: size
+      in: query
+      schema:
+        type: integer
+        minimum: 1
+        maximum: 100
+        default: 20
+
+  responses:
+
+    ValidationFailed:
+      description: Body validation failed; `fieldErrors` names each field.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ApiError'
+          example:
+            status: 400
+            error: Bad Request
+            message: Request validation failed
+            timestamp: '2026-01-15T10:00:00Z'
+            fieldErrors:
+              - field: email
+                message: must be a well-formed email address
+              - field: password
+                message: size must be between 8 and 72
+
+    Unauthenticated:
+      description: Missing or wrong credentials, or an inactive operator.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ApiError'
+          example:
+            status: 401
+            error: Unauthorized
+            message: Authentication required
+            timestamp: '2026-01-15T10:00:00Z'
+            fieldErrors: []
+
+    Forbidden:
+      description: Missing permission.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ApiError'
+          example:
+            status: 403
+            error: Forbidden
+            message: Access denied
+            timestamp: '2026-01-15T10:00:00Z'
+            fieldErrors: []
+
+    UserNotFound:
+      description: No operator has this id.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ApiError'
+
+    StoreUnavailable:
+      description: Database or search node unreachable. Nothing was saved.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ApiError'
+          example:
+            status: 503
+            error: Service Unavailable
+            message: A backing service is unavailable
+            timestamp: '2026-01-15T10:00:00Z'
+            fieldErrors: []
+
+  schemas:
+
+    Permission:
+      type: string
+      enum:
+        - VIEW_USERS
+        - MANAGE_USERS
+        - VIEW_PLANS
+        - MANAGE_PLANS
+        - VIEW_SUBSCRIBERS
+        - MANAGE_SUBSCRIBERS
+        - VIEW_PAYMENTS
+        - MANAGE_PAYMENTS
+        - MANAGE_SYSTEM
+
+    CreateUserRequest:
+      type: object
+      required: [name, email, password]
+      properties:
+        name:
+          type: string
+          minLength: 1
+          maxLength: 120
+        email:
+          type: string
+          pattern: '^[^@\s]+@[^@\s]+$'
+          maxLength: 255
+        password:
+          type: string
+          format: password
+          minLength: 8
+          maxLength: 72
+        permissions:
+          type: array
+          uniqueItems: true
+          items:
+            $ref: '#/components/schemas/Permission'
+      example:
+        name: Ada Lovelace
+        email: ada@recurve.local
+        password: correct-horse-battery
+        permissions: [MANAGE_USERS]
+
+    UpdateUserRequest:
+      type: object
+      required: [name, email]
+      properties:
+        name:
+          type: string
+          minLength: 1
+          maxLength: 120
+        email:
+          type: string
+          pattern: '^[^@\s]+@[^@\s]+$'
+          maxLength: 255
+        permissions:
+          type: array
+          uniqueItems: true
+          items:
+            $ref: '#/components/schemas/Permission'
+          description: Absent means none.
+      example:
+        name: Ada Lovelace
+        email: ada@recurve.local
+        permissions: [MANAGE_USERS, MANAGE_PLANS]
+
+    UserResponse:
+      type: object
+      required: [id, name, email, permissions, active, createdAt]
+      properties:
+        id:
+          type: string
+          format: uuid
+        name:
+          type: string
+        email:
+          type: string
+          description: Trimmed and lower-cased.
+        permissions:
+          type: array
+          uniqueItems: true
+          items:
+            $ref: '#/components/schemas/Permission'
+        active:
+          type: boolean
+        createdAt:
+          type: string
+          format: date-time
+      example:
+        id: 9d1b2b2e-6c8e-4c53-9d5a-1f2a3b4c5d6e
+        name: Ada Lovelace
+        email: ada@recurve.local
+        permissions: [MANAGE_USERS]
+        active: true
+        createdAt: '2026-01-15T10:00:00Z'
+
+    UserPage:
+      type: object
+      example:
+        items:
+          - id: 9d1b2b2e-6c8e-4c53-9d5a-1f2a3b4c5d6e
+            name: Ada Lovelace
+            email: ada@recurve.local
+            permissions: [MANAGE_USERS]
+            active: true
+            createdAt: '2026-01-15T10:00:00Z'
+        page: 0
+        size: 20
+        total: 1
+      required: [items, page, size, total]
+      properties:
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/UserResponse'
+        page:
+          type: integer
+          minimum: 0
+        size:
+          type: integer
+          minimum: 1
+        total:
+          type: integer
+          format: int64
+          minimum: 0
+          description: Matches across all pages.
+
+    ReindexResponse:
+      type: object
+      required: [indexed]
+      properties:
+        indexed:
+          type: integer
+          format: int64
+          minimum: 0
+
+    ApiError:
+      type: object
+      required: [status, error, message, timestamp, fieldErrors]
+      properties:
+        status:
+          type: integer
+        error:
+          type: string
+        message:
+          type: string
+        timestamp:
+          type: string
+          format: date-time
+        fieldErrors:
+          type: array
+          items:
+            $ref: '#/components/schemas/FieldError'
+      example:
+        status: 404
+        error: Not Found
+        message: Operator 9d1b2b2e-6c8e-4c53-9d5a-1f2a3b4c5d6e not found
+        timestamp: '2026-01-15T10:00:00Z'
+        fieldErrors: []
+
+    FieldError:
+      type: object
+      required: [field, message]
+      properties:
+        field:
+          type: string
+        message:
+          type: string

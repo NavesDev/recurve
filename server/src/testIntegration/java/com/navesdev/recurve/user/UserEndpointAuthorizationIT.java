@@ -3,6 +3,7 @@ package com.navesdev.recurve.user;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.httpBasic;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.header;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
@@ -82,8 +83,14 @@ class UserEndpointAuthorizationIT {
     }
 
     @Test
-    void refusesAnAnonymousRequest() throws Exception {
-        mvc.perform(get("/api/users")).andExpect(status().isUnauthorized());
+    void refusesAnAnonymousRequestWithoutInvitingABrowserToLogIn() throws Exception {
+        // No Basic challenge: it would make a browser pop its own dialog over
+        // any client, and the body already says what happened.
+        mvc.perform(get("/api/users"))
+                .andExpect(status().isUnauthorized())
+                .andExpect(header().doesNotExist("WWW-Authenticate"))
+                .andExpect(jsonPath("$.status").value(401))
+                .andExpect(jsonPath("$.message").value("Authentication required"));
     }
 
     @Test

@@ -395,6 +395,7 @@ Abstract bases in `shared/domain/exception/`; concrete ones in
 | `ExternalServiceException` | external service failed | 502 | `PaymentGatewayException` |
 | `MethodArgumentNotValidException` | Bean Validation | 400 | — |
 | `InvalidRequestException` | request shape Bean Validation cannot express | 400 | sort field outside the allowed list |
+| `AuthenticationException` | no, wrong or refused credentials; no `WWW-Authenticate` challenge, so a browser never pops its own dialog over a client | 401 | — |
 | `AccessDeniedException` | missing permission | 403 | — |
 | `DataAccessResourceFailureException` | a store cannot be reached | 503 | search node down; fixed message, never the host |
 
@@ -515,6 +516,38 @@ The page limit is `recurve.listing.max-page-size` (default 100), one
 value for every listing: it is the API's rule about how much a response
 may carry, not a property of any index.
 
+## API contract
+
+The API's promise to a client is `src/main/resources/docs/openapi.yaml`,
+written by hand — **contract-first**. Nothing is generated from the
+code, and nothing in the code is generated from it: the request and
+response records stay ordinary records. A change to what an endpoint
+takes or returns is a change to the contract first.
+
+The document is only displayed. `shared/config/DocsConfig` serves it and
+a Swagger UI over it under `/docs`, to anyone: the contract is a shape,
+not data, and the UI has to fetch it before any credential exists. A call
+made through the UI still needs Basic Auth. `recurve.docs.enabled` is one
+switch for all of it — off, `DocsConfig` does not exist, `/docs` is not
+mapped and falls under the default `authenticated()` rule, so a stranger
+gets a 401 rather than a 404. Production turns it off.
+
+A hand-written contract can drift, so two tests hold it to the code:
+
+| Test | Root | Proves |
+|---|---|---|
+| `ApiContractTest` | test | the document is valid OpenAPI, and the routes it names are exactly the routes the controllers map — no more, no fewer |
+| `<Feature>ContractIT` | testIntegration | every real exchange, request and response, is one the contract allows (`openapi-request-validator`) |
+
+The contract states what the server actually enforces, not what would be
+nice: an email is `^[^@\s]+@[^@\s]+$` because that is `UserValidator`'s
+rule, not `format: email`, which promises RFC 5321 and would fail the
+conformance test on a `.local` address the server accepts.
+
+Descriptions stay short. The schema, the limits and the examples carry
+the documentation; a paragraph on an operation is a sign that a rule is
+missing from the schema.
+
 ## Tests
 
 Same structure as the code: package per feature, subpackage per layer.
@@ -553,6 +586,8 @@ Two source roots, so that the unit suite never needs a server:
 | JPA persistence | testIntegration | real database (`@DataJpaTest`) | lookups, custom queries |
 | Search persistence | testIntegration | real node (`@DataElasticsearchTest`) | the listing rules FR-06, FR-07 on the mapped index |
 | Authorization | testIntegration | `@SpringBootTest` + HTTP Basic | the route rules in `SecurityConfig` |
+| Contract | test + testIntegration | parser; `@SpringBootTest` + the request validator | the document is valid and names the mapped routes; real exchanges match it |
+| Docs | testIntegration | `@SpringBootTest` with the property on and off | `/docs` is open when enabled and absent when not |
 | Fail-fast | testIntegration | `@SpringBootTest`, search repository mocked to fail | the rollback the transaction promises |
 
 Integration tests use their own database (`recurve-test`) and their own

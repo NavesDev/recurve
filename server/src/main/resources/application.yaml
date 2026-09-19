@@ -25,6 +25,11 @@ recurve:
     # Prepended to every index name. Empty in development; the integration
     # tests set "test-" so they never touch a development index.
     index-prefix: ""
+  docs:
+    # Serves the API contract and the Swagger UI at /docs, to anyone. The
+    # contract is only a shape; a call through the UI still needs Basic
+    # Auth. Turn off in production.
+    enabled: ${DOCS_ENABLED:true}
   bootstrap:
     admin:
       email: ${BOOTSTRAP_ADMIN_EMAIL:}

@@ -136,8 +136,10 @@ Offset-based.
 ## Business rules
 
 - BR-01 Permissions per resource: a view permission and a manage
-  permission for each of operators, plans, subscribers and payments.
-  Manage implies view. One more permission, `MANAGE_SYSTEM`, covers
+  permission for each of plans, subscribers and payments. Manage implies
+  view. Operators have a manage permission only: whoever may see the
+  operators may change them, since a read-only view of who runs the
+  system serves nobody. One more permission, `MANAGE_SYSTEM`, covers
   operational routines (rebuilding a search index) and implies nothing.
 - BR-02 Operator email is unique. Subscriber email is unique.
 - BR-03 A plan has no price of its own; amount and cycle live in the

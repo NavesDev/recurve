@@ -190,7 +190,7 @@ class UserSearchRepositoryIT {
 
         @Test
         void aFilterOnAClosedFieldIsRefused() {
-            assertThat(refusalOf(() -> search(filteredBy("permissions", "VIEW_USERS")))).contains("permissions");
+            assertThat(refusalOf(() -> search(filteredBy("permissions", "MANAGE_USERS")))).contains("permissions");
         }
 
         @Test
@@ -322,7 +322,7 @@ class UserSearchRepositoryIT {
     }
 
     private static UserSummary summary(String name, String email, Instant createdAt) {
-        return new UserSummary(UUID.randomUUID(), name, email, Set.of(Permission.VIEW_USERS), true, createdAt);
+        return new UserSummary(UUID.randomUUID(), name, email, Set.of(Permission.MANAGE_USERS), true, createdAt);
     }
 
     private void deactivate(String email) {

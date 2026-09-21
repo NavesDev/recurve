@@ -4,14 +4,15 @@ import java.util.Set;
 
 /**
  * Granular access. Most permissions come in pairs, one read and one write
- * per resource (BR-01); {@link #MANAGE_SYSTEM} stands alone, an
- * administrative operation with no read counterpart. Access is not
- * modelled as a role: an operator holds exactly the permissions granted
- * to them.
+ * per resource (BR-01). Two stand alone: {@link #MANAGE_USERS}, because
+ * seeing who operates the system without being able to change it serves
+ * no one, and {@link #MANAGE_SYSTEM}, an administrative operation with no
+ * resource of its own. Access is not modelled as a role: an operator
+ * holds exactly the permissions granted to them.
  */
 public enum Permission {
 
-    VIEW_USERS,
+    /** Operators and their permissions. No read counterpart: managing them is the only reason to see them. */
     MANAGE_USERS,
     VIEW_PLANS,
     MANAGE_PLANS,
@@ -30,7 +31,6 @@ public enum Permission {
      */
     public Set<Permission> expand() {
         return switch (this) {
-            case MANAGE_USERS -> Set.of(MANAGE_USERS, VIEW_USERS);
             case MANAGE_PLANS -> Set.of(MANAGE_PLANS, VIEW_PLANS);
             case MANAGE_SUBSCRIBERS -> Set.of(MANAGE_SUBSCRIBERS, VIEW_SUBSCRIBERS);
             case MANAGE_PAYMENTS -> Set.of(MANAGE_PAYMENTS, VIEW_PAYMENTS);

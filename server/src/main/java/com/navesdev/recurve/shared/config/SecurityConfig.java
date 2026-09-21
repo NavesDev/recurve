@@ -51,7 +51,7 @@ public class SecurityConfig {
                     requests
                         // FR-01.5: rebuilding an index is a system operation.
                         .requestMatchers(HttpMethod.POST, "/api/users/reindex").hasAuthority("MANAGE_SYSTEM")
-                        .requestMatchers(HttpMethod.GET, "/api/users/**").hasAuthority("VIEW_USERS")
+                        // BR-01: operators have no view permission; reading them is managing them.
                         .requestMatchers("/api/users/**").hasAuthority("MANAGE_USERS")
                         .anyRequest().authenticated();
                 })

@@ -75,7 +75,7 @@ class UserEndpointAuthorizationIT {
         // Distinct names on purpose: sorting by name has nothing to say
         // about operators whose names all tie.
         register("Maya Manager", "manager@recurve.local", Set.of(Permission.MANAGE_USERS), true);
-        register("Vera Viewer", "viewer@recurve.local", Set.of(Permission.VIEW_USERS), true);
+        register("Vera Viewer", "viewer@recurve.local", Set.of(Permission.VIEW_PLANS), true);
         register("Otto Outsider", "outsider@recurve.local", Set.of(Permission.VIEW_PLANS), true);
         register("Rita Retired", "retired@recurve.local", Set.of(Permission.MANAGE_USERS), false);
         register("Sam Sysadmin", "sysadmin@recurve.local", Set.of(Permission.MANAGE_SYSTEM), true);
@@ -106,27 +106,16 @@ class UserEndpointAuthorizationIT {
     }
 
     @Test
-    void manageImpliesViewSoAManagerMayList() throws Exception {
+    void aManagerMayList() throws Exception {
         mvc.perform(get("/api/users").with(basic("manager@recurve.local")))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.total").value(5));
     }
 
     @Test
-    void aViewerMayListButNotCreate() throws Exception {
+    void anOperatorWithoutUserPermissionsIsRefusedEvenAListing() throws Exception {
+        // BR-01: there is no VIEW_USERS; reading operators takes MANAGE_USERS.
         mvc.perform(get("/api/users").with(basic("viewer@recurve.local")))
-                .andExpect(status().isOk());
-
-        mvc.perform(post("/api/users")
-                .with(basic("viewer@recurve.local"))
-                .contentType(MediaType.APPLICATION_JSON)
-                .content(body("new@recurve.local")))
-                .andExpect(status().isForbidden());
-    }
-
-    @Test
-    void anOperatorWithoutUserPermissionsIsRefused() throws Exception {
-        mvc.perform(get("/api/users").with(basic("outsider@recurve.local")))
                 .andExpect(status().isForbidden())
                 .andExpect(jsonPath("$.status").value(403))
                 .andExpect(jsonPath("$.message").value("Access denied"));
@@ -138,7 +127,7 @@ class UserEndpointAuthorizationIT {
         // operator who may not create a user gets a 403, not a 400 that
         // would tell them what a valid body looks like.
         mvc.perform(post("/api/users")
-                .with(basic("viewer@recurve.local"))
+                .with(basic("outsider@recurve.local"))
                 .contentType(MediaType.APPLICATION_JSON)
                 .content("{}"))
                 .andExpect(status().isForbidden());

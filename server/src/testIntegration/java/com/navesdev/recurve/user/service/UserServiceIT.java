@@ -50,7 +50,7 @@ class UserServiceIT {
                     .when(searchRepository).save(any(UserSummary.class));
 
             assertThatThrownBy(() -> service.create(new CreateUserCommand(
-                    "Ada Lovelace", "ada@recurve.local", "s3cret-password", Set.of(Permission.VIEW_USERS))))
+                    "Ada Lovelace", "ada@recurve.local", "s3cret-password", Set.of(Permission.VIEW_PLANS))))
                     .isInstanceOf(DataAccessResourceFailureException.class);
 
             assertThat(repository.existsByEmail("ada@recurve.local")).isFalse();

@@ -27,11 +27,12 @@ System operator. Access controlled by granular permissions, not by role.
 
 One read permission and one write permission per resource. `MANAGE_*`
 implies the matching `VIEW_*`; a read check accepts either of the two.
+Operators are the exception: there is no `VIEW_USERS`, and `MANAGE_USERS`
+covers reading them too (BR-01).
 
 | Value | Covers |
 |---|---|
-| `VIEW_USERS` | list operators and their permissions |
-| `MANAGE_USERS` | create/edit/deactivate operators and permissions |
+| `MANAGE_USERS` | list/create/edit/deactivate operators and permissions |
 | `VIEW_PLANS` | list plans and prices |
 | `MANAGE_PLANS` | create/edit/deactivate plans and prices |
 | `VIEW_SUBSCRIBERS` | list subscribers |

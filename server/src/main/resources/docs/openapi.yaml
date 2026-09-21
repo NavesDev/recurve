@@ -323,7 +323,6 @@ components:
     Permission:
       type: string
       enum:
-        - VIEW_USERS
         - MANAGE_USERS
         - VIEW_PLANS
         - MANAGE_PLANS

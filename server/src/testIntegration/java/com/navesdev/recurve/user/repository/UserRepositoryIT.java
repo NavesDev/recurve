@@ -60,13 +60,13 @@ class UserRepositoryIT {
 
         @Test
         void thePermissionsGrantedAtRegistrationAreTheOnesFoundAtSignIn() {
-            register("Ada Lovelace", "ada@recurve.local", Set.of(Permission.MANAGE_USERS));
+            register("Ada Lovelace", "ada@recurve.local", Set.of(Permission.MANAGE_PLANS));
             entityManager.clear();
 
             User found = repository.findByEmail("ada@recurve.local").orElseThrow();
 
             assertThat(found.authorities())
-                    .containsExactlyInAnyOrder(Permission.MANAGE_USERS, Permission.VIEW_USERS);
+                    .containsExactlyInAnyOrder(Permission.MANAGE_PLANS, Permission.VIEW_PLANS);
         }
     }
 

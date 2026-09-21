@@ -290,7 +290,6 @@ Spring Security, HTTP Basic, and **one rule per route family** in
 
 ```java
 .requestMatchers(HttpMethod.POST, "/api/users/reindex").hasAuthority("MANAGE_SYSTEM")
-.requestMatchers(HttpMethod.GET, "/api/users/**").hasAuthority("VIEW_USERS")
 .requestMatchers("/api/users/**").hasAuthority("MANAGE_USERS")
 .anyRequest().authenticated()
 ```

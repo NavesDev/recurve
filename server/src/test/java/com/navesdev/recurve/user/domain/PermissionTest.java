@@ -14,13 +14,18 @@ class PermissionTest {
 
         @Test
         void managingAResourceGrantsViewingIt() {
-            assertThat(Permission.MANAGE_USERS.expand())
-                    .containsExactlyInAnyOrder(Permission.MANAGE_USERS, Permission.VIEW_USERS);
+            assertThat(Permission.MANAGE_PLANS.expand())
+                    .containsExactlyInAnyOrder(Permission.MANAGE_PLANS, Permission.VIEW_PLANS);
         }
 
         @Test
         void viewingGrantsNothingElse() {
-            assertThat(Permission.VIEW_USERS.expand()).containsExactly(Permission.VIEW_USERS);
+            assertThat(Permission.VIEW_PLANS.expand()).containsExactly(Permission.VIEW_PLANS);
+        }
+
+        @Test
+        void managingOperatorsHasNoViewCounterpartAndGrantsNothingElse() {
+            assertThat(Permission.MANAGE_USERS.expand()).containsExactly(Permission.MANAGE_USERS);
         }
 
         @Test

@@ -77,17 +77,17 @@ class UserTest {
 
         @Test
         void managingAResourceGrantsTheRightToViewIt() {
-            User operator = newOperator(Set.of(Permission.MANAGE_USERS));
+            User operator = newOperator(Set.of(Permission.MANAGE_PLANS));
 
             assertThat(operator.authorities())
-                    .containsExactlyInAnyOrder(Permission.MANAGE_USERS, Permission.VIEW_USERS);
+                    .containsExactlyInAnyOrder(Permission.MANAGE_PLANS, Permission.VIEW_PLANS);
         }
 
         @Test
         void theImplicationDoesNotReachAnotherResource() {
-            User operator = newOperator(Set.of(Permission.MANAGE_USERS));
+            User operator = newOperator(Set.of(Permission.MANAGE_PLANS));
 
-            assertThat(operator.authorities()).doesNotContain(Permission.VIEW_PLANS);
+            assertThat(operator.authorities()).doesNotContain(Permission.VIEW_SUBSCRIBERS);
         }
 
         @Test

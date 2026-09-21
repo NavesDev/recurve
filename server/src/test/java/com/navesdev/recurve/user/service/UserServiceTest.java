@@ -306,6 +306,6 @@ class UserServiceTest {
 
     private static User existingOperator() {
         return User.create("Ada", "ada@recurve.local", "$2a$10$hash",
-                Set.of(Permission.VIEW_USERS), NOW);
+                Set.of(Permission.VIEW_PLANS), NOW);
     }
 }

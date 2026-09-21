@@ -87,7 +87,7 @@ class UserContractIT {
         entityManager.createNativeQuery("TRUNCATE users CASCADE").executeUpdate();
 
         register("Maya Manager", "manager@recurve.local", Set.of(Permission.MANAGE_USERS, Permission.MANAGE_SYSTEM));
-        viewerId = register("Vera Viewer", "viewer@recurve.local", Set.of(Permission.VIEW_USERS));
+        viewerId = register("Vera Viewer", "viewer@recurve.local", Set.of(Permission.VIEW_PLANS));
         entityManager.flush();
     }
 
@@ -143,7 +143,7 @@ class UserContractIT {
         mvc.perform(put("/api/users/{id}", viewerId).with(manager())
                 .contentType(MediaType.APPLICATION_JSON)
                 .content("""
-                        {"name":"Vera Viewer","email":"vera@recurve.local","permissions":["VIEW_USERS","VIEW_PLANS"]}
+                        {"name":"Vera Viewer","email":"vera@recurve.local","permissions":["VIEW_PLANS","VIEW_SUBSCRIBERS"]}
                         """))
                 .andExpect(status().isOk())
                 .andExpect(CONTRACT);

@@ -1,0 +1,100 @@
+# Pull-request checks for the server. Four independent jobs, each one
+# Maven step, so a failure names the stage that broke; none of them runs
+# the full `verify`. Mark all four as required checks on main.
+name: CI
+
+on:
+  pull_request:
+    branches: [main]
+
+defaults:
+  run:
+    working-directory: server
+
+jobs:
+  lint:
+    name: lint
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '25'
+          cache: maven
+      - run: ./mvnw -B pmd:check
+
+  test:
+    name: test
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '25'
+          cache: maven
+      - run: ./mvnw -B test
+
+  test-integration:
+    name: test-integration
+    runs-on: ubuntu-latest
+    # Same images as docker-compose.yaml; the tests expect an empty
+    # "recurve-test" database and an Elasticsearch node with security off.
+    services:
+      postgres:
+        image: postgres:18
+        env:
+          POSTGRES_DB: recurve-test
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+      elasticsearch:
+        image: docker.elastic.co/elasticsearch/elasticsearch:9.4.7
+        env:
+          discovery.type: single-node
+          xpack.security.enabled: 'false'
+          ES_JAVA_OPTS: -Xms512m -Xmx512m
+        ports:
+          - 9200:9200
+        options: >-
+          --health-cmd "curl -sf http://localhost:9200/_cluster/health"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 30
+    env:
+      TEST_DB_URL: jdbc:postgresql://localhost:5432/recurve-test
+      TEST_ES_URL: http://localhost:9200
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '25'
+          cache: maven
+      # The integration profile skips surefire; -Dpmd.skip keeps lint in
+      # its own job.
+      - run: ./mvnw -B verify -Pintegration -Dpmd.skip
+
+  build:
+    name: build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '25'
+          cache: maven
+      - run: ./mvnw -B -DskipTests package
+      - uses: actions/upload-artifact@v4
+        with:
+          name: recurve-server
+          path: server/target/*.jar
+          if-no-files-found: error

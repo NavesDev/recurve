@@ -1,0 +1,28 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Recurve API</title>
+  <link rel="stylesheet" href="ui/swagger-ui.css">
+</head>
+<body>
+  <div id="swagger-ui"></div>
+  <script src="ui/swagger-ui-bundle.js"></script>
+  <script src="ui/swagger-ui-standalone-preset.js"></script>
+  <script>
+    window.onload = () => {
+      window.ui = SwaggerUIBundle({
+        url: "openapi.yaml",
+        dom_id: "#swagger-ui",
+        presets: [SwaggerUIBundle.presets.apis, SwaggerUIStandalonePreset],
+        layout: "BaseLayout",
+        // Basic Auth entered through "Authorize" is kept for the tab.
+        persistAuthorization: true,
+        tryItOutEnabled: true,
+        displayRequestDuration: true
+      });
+    };
+  </script>
+</body>
+</html>

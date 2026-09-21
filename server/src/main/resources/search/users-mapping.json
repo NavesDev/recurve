@@ -1,0 +1,24 @@
+{
+  "properties": {
+    "id": { "type": "keyword", "index": false },
+    "name": {
+      "type": "text",
+      "analyzer": "prefix",
+      "search_analyzer": "prefix_search",
+      "fields": {
+        "keyword": { "type": "keyword", "normalizer": "lowercase" }
+      }
+    },
+    "email": {
+      "type": "text",
+      "analyzer": "prefix",
+      "search_analyzer": "prefix_search",
+      "fields": {
+        "keyword": { "type": "keyword", "normalizer": "lowercase" }
+      }
+    },
+    "permissions": { "type": "keyword", "index": false, "doc_values": false },
+    "active": { "type": "boolean", "index": false },
+    "createdAt": { "type": "date", "format": "date_time", "index": false }
+  }
+}

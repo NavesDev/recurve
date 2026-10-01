@@ -49,28 +49,31 @@ The product. It has no price or interval of its own; those live in
 |---|---|---|---|
 | id | UUID | `id` | PK |
 | name | String | `name` | not null |
-| description | String | `description` | nullable |
-| active | boolean | `active` | not null. An inactive plan accepts no new subscribers |
+| description | String | `description` | nullable, at most 500 |
+| active | boolean | `active` | not null. An inactive plan accepts no new subscribers and no new price |
+| version | Long | `version` | not null. Optimistic lock; a lost race is a 409 |
 | createdAt | Instant | `created_at` | not null |
 
 ## PlanPrice
 
-How much and how often. Same aggregate as `Plan`, lives in `plan`.
-Changing a price means creating a new `PlanPrice` and deactivating the old
-one; existing subscribers stay on the old one.
+How much and how often. Same aggregate as `Plan`, lives in `plan`, and is
+held by the plan by object (`@OneToMany`) — the one exception to "by id",
+because it is the same aggregate. Changing a price means creating a new
+`PlanPrice` and deactivating the old one (`POST /api/prices/{id}/replace`);
+existing subscribers stay on the old one.
 
 | Field | Type | Column | Notes |
 |---|---|---|---|
 | id | UUID | `id` | PK |
 | planId | UUID | `plan_id` | FK `plans.id`, not null |
-| price | BigDecimal | `price numeric(12,2)` | not null |
-| currency | String | `currency char(3)` | not null, ISO 4217, e.g. `BRL` |
-| interval | BillingInterval | `interval` | not null, enum as string |
+| price | BigDecimal | `price numeric(12,2)` | not null, `> 0` |
+| currency | String | `currency varchar(3)` | not null, ISO 4217, upper case, e.g. `BRL` |
+| interval | BillingInterval | `billing_interval` | not null, enum as string. `INTERVAL` is an SQL keyword |
 | active | boolean | `active` | not null |
 | createdAt | Instant | `created_at` | not null |
 
-Partial unique index: `(plan_id, interval, currency) WHERE active`
-(see Indexes).
+At most one active price per `(plan_id, billing_interval, currency)`: a
+deferred exclusion constraint (see Indexes).
 
 ### BillingInterval (enum, `plan`)
 
@@ -112,7 +115,7 @@ without altering history.
 | id | UUID | `id` | PK |
 | subscriberId | UUID | `subscriber_id` | FK `subscribers.id`, not null |
 | amount | BigDecimal | `amount numeric(12,2)` | not null |
-| currency | String | `currency char(3)` | not null |
+| currency | String | `currency varchar(3)` | not null |
 | status | PaymentStatus | `status` | not null, enum as string |
 | dueAt | Instant | `due_at` | not null |
 | paidAt | Instant | `paid_at` | nullable |
@@ -136,6 +139,9 @@ without altering history.
 - A relationship between aggregates is by id (`planPriceId: UUID`), not by
   object (`@ManyToOne`). This keeps lazy loading from leaking into the
   domain and keeps the feature decoupled.
+- Inside one aggregate the relation is by object: `Plan` holds its
+  `PlanPrice`s, because BR-03 is a rule over that set and only the root
+  can guard it.
 - An enum is persisted as `@Enumerated(EnumType.STRING)`.
 - FKs and indexes live in the schema (see Indexes).
 
@@ -152,7 +158,7 @@ is already filtered (sorting one page in memory is irrelevant).
 | `user_permissions` | `(user_id, permission)` | PK | load the operator's permissions |
 | `plans` | `active` | btree | FR-02.4, list active ones only |
 | `plan_prices` | `plan_id` | btree | FK; list a plan's prices |
-| `plan_prices` | `(plan_id, interval, currency) WHERE active` | partial unique | BR-03; filter by cycle (FR-06.2) |
+| `plan_prices` | `ex_plan_prices_one_active` `(plan_id, billing_interval, currency) WHERE active` | exclusion constraint, deferred | BR-03, checked at commit so a replace can insert the successor before deactivating the old price |
 | `subscribers` | `email` | unique | BR-02 |
 | `subscribers` | `plan_price_id` | btree | FK; filter by plan (FR-06.3); subscription count (FR-06.2) |
 | `subscribers` | `status` | btree | filter by status (FR-06.3) |
@@ -179,5 +185,5 @@ migrations produced; it never changes it.
 
 Migrations are versioned `V<n>__<description>.sql` and are immutable once
 merged: a correction is a new migration, never an edit of an applied one.
-Only `users` and `user_permissions` exist so far; the tables for `plan`,
+`V1` creates the operator tables and `V2` the plan tables; the tables for
 `subscriber` and `payment` come with their features.

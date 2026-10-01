@@ -16,6 +16,9 @@ import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.web.servlet.mvc.method.RequestMappingInfo;
 import org.springframework.web.servlet.mvc.method.annotation.RequestMappingHandlerMapping;
 
+import com.navesdev.recurve.plan.controller.PlanController;
+import com.navesdev.recurve.plan.controller.PriceController;
+import com.navesdev.recurve.plan.service.PlanService;
 import com.navesdev.recurve.shared.controller.ListingRequests;
 import com.navesdev.recurve.user.controller.UserController;
 import com.navesdev.recurve.user.service.UserService;
@@ -32,7 +35,7 @@ import io.swagger.v3.parser.core.models.SwaggerParseResult;
  * the document must be valid OpenAPI, and the routes it names must be
  * exactly the routes the controllers map.
  */
-@WebMvcTest(controllers = UserController.class)
+@WebMvcTest(controllers = { UserController.class, PlanController.class, PriceController.class })
 class ApiContractTest {
 
     private static final String CONTRACT = "docs/openapi.yaml";
@@ -44,6 +47,9 @@ class ApiContractTest {
 
     @MockitoBean
     private UserService userService;
+
+    @MockitoBean
+    private PlanService planService;
 
     @MockitoBean
     private ListingRequests listingRequests;

@@ -16,6 +16,7 @@ import org.springframework.web.bind.annotation.RestController;
 import com.navesdev.recurve.shared.controller.Listing;
 import com.navesdev.recurve.shared.controller.ListingRequest;
 import com.navesdev.recurve.shared.controller.PageResponse;
+import com.navesdev.recurve.shared.controller.ReindexResponse;
 import com.navesdev.recurve.user.domain.User;
 import com.navesdev.recurve.user.service.UserService;
 

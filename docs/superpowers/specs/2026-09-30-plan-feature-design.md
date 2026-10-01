@@ -23,7 +23,8 @@ the patterns the `user` feature set (`server/docs/architecture.md`).
 | Listing filter "has an active price with cycle X" | A derived field in the read model, `activeIntervals`, so the existing `SearchQueries` `terms` filter serves it unchanged. No `nested` mapping. |
 | Sort by number of subscriptions (BR-10) | Deferred to the `subscriber` feature, which is what will keep that count. |
 | Sort by price | Still **[open]** in the requirements. Not built. |
-| Concurrent writes on one plan | Optimistic lock (`@Version` on `Plan`); a lost race is a 409. The partial unique index is the last line for BR-03. |
+| Concurrent writes on one plan | Optimistic lock (`@Version` on `Plan`); a lost race is a 409. A deferred exclusion constraint is the last line for BR-03. |
+| BR-03 in the schema | `EXCLUDE ... WHERE (active) DEFERRABLE INITIALLY DEFERRED`, not a partial unique index. A replace deactivates the old price and inserts its successor in one transaction, and Hibernate flushes inserts before updates: an immediate check would see two active prices for a moment. Deferred, it is checked at commit. |
 
 ## Domain
 
@@ -33,8 +34,12 @@ is a rule over the set of a plan's prices.
 
 The architecture says a relationship between aggregates is by id. This is
 **one** aggregate, so `Plan` holds its prices by object:
-`@OneToMany(mappedBy = "plan", cascade = {PERSIST, MERGE})` with
-`@BatchSize`, no `orphanRemoval` (nothing is ever deleted).
+a unidirectional `@OneToMany(cascade = {PERSIST, MERGE}, fetch = EAGER)`
+with `@JoinColumn(name = "plan_id", nullable = false, updatable = false)`,
+fetched by a separate batched select as `User.permissions` is (open-in-view
+is off, and a response reads the prices after the transaction). No
+`orphanRemoval`: nothing is ever deleted. A price keeps no reference back
+to its plan; nothing that reads a price needs one yet.
 
 ```java
 Plan.create(name, description, now)
@@ -101,22 +106,35 @@ CREATE TABLE plans (
 CREATE INDEX ix_plans_active ON plans (active);
 
 CREATE TABLE plan_prices (
-    id         uuid          PRIMARY KEY,
-    plan_id    uuid          NOT NULL REFERENCES plans (id),
-    price      numeric(12,2) NOT NULL CHECK (price > 0),
-    currency   char(3)       NOT NULL,
-    interval   varchar(10)   NOT NULL,
-    active     boolean       NOT NULL,
-    created_at timestamptz   NOT NULL
+    id               uuid          PRIMARY KEY,
+    plan_id          uuid          NOT NULL REFERENCES plans (id),
+    price            numeric(12,2) NOT NULL CHECK (price > 0),
+    currency         varchar(3)    NOT NULL,
+    billing_interval varchar(10)   NOT NULL,
+    active           boolean       NOT NULL,
+    created_at       timestamptz   NOT NULL
 );
 CREATE INDEX ix_plan_prices_plan_id ON plan_prices (plan_id);
-CREATE UNIQUE INDEX ux_plan_prices_active
-    ON plan_prices (plan_id, interval, currency) WHERE active;
+ALTER TABLE plan_prices ADD CONSTRAINT ex_plan_prices_one_active
+    EXCLUDE USING btree (plan_id WITH =, billing_interval WITH =, currency WITH =)
+    WHERE (active)
+    DEFERRABLE INITIALLY DEFERRED;
 ```
 
-No `ON DELETE CASCADE`: nothing deletes a plan. The partial unique index
-is a backstop for two requests racing past the domain check; the
-optimistic lock normally catches that race first.
+Departures from `data-model.md`, recorded there by this work:
+
+- `billing_interval`, not `interval`: `INTERVAL` is an SQL keyword.
+- `currency varchar(3)`, not `char(3)`: Hibernate's schema validation
+  expects `varchar` for a `String`, and the validator already fixes the
+  length at three.
+- BR-03 is a deferred exclusion constraint, not a partial unique index
+  (see Decisions). It is backed by a btree index, so it serves the same
+  lookups the partial index would have.
+
+No `ON DELETE CASCADE`: nothing deletes a plan. The constraint is a
+backstop for two requests racing past the domain check; the optimistic
+lock normally catches that race first. Adding a price changes the plan's
+own collection, so it increments the plan's version.
 
 ## Application
 
@@ -143,7 +161,11 @@ replace answers with the old price inactive and the successor active.
 `findActivePrice(priceId)` — what `subscriber` will call to start a
 subscription — is **not** built here; it arrives with its caller.
 
-`PlanIndexBootstrap` mirrors `UserIndexBootstrap`, `@Order(2)`.
+`PlanIndexBootstrap` mirrors `UserIndexBootstrap`, `@Order(1)`: nothing at
+startup writes a plan, so it only has to come before the requests do.
+
+`ReindexResponse` moves from `user/controller` to `shared/controller`:
+both reindex endpoints answer with it.
 
 ## Persistence
 
@@ -226,9 +248,9 @@ with the `ApiError` body.
 | `PlanServiceTest` | test | orchestration, indexing on every write, 404s, a price found through its plan |
 | `PlanControllerTest`, `PriceControllerTest` | test | request validation, status, serialization |
 | `GlobalExceptionHandlerTest` or the controller test | test | optimistic lock → 409 |
-| `PlanRepositoryIT` | testIntegration | `findByPriceId`, `streamAll`, the partial unique index refusing two active prices on one pair |
+| `PlanRepositoryIT` | testIntegration | `findByPriceId`, `streamAll`, the exclusion constraint refusing two active prices on one pair and accepting a replace |
 | `PlanSearchRepositoryIT` | testIntegration | FR-06.2: `q` on name, `activeIntervals` and `active` filters, default sort, paging |
-| `PlanIndexBootstrapIT`, `PlanServiceIT` | testIntegration | index created at boot; rollback when indexing fails |
+| `PlanIndexBootstrapIT`, `PlanServiceIT` | testIntegration | index created at boot; rollback when indexing fails; a replace commits; a stale copy of a plan is refused |
 | `PlanEndpointAuthorizationIT` | testIntegration | `VIEW_PLANS` reads and cannot write; `MANAGE_PLANS` writes; reindex needs `MANAGE_SYSTEM`; `/api/prices/**` needs `MANAGE_PLANS` |
 | `PlanContractIT` | testIntegration | every real exchange matches `openapi.yaml` |
 | `ApiContractTest` | test | existing; now holds the new routes to the contract |

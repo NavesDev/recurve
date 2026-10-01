@@ -1,0 +1,18 @@
+{
+  "properties": {
+    "id": { "type": "keyword", "index": false },
+    "name": {
+      "type": "text",
+      "analyzer": "prefix",
+      "search_analyzer": "prefix_search",
+      "fields": {
+        "keyword": { "type": "keyword", "normalizer": "lowercase" }
+      }
+    },
+    "description": { "type": "text", "index": false },
+    "active": { "type": "boolean", "index": false },
+    "createdAt": { "type": "date", "format": "date_time", "index": false },
+    "activeIntervals": { "type": "keyword", "index": false },
+    "prices": { "type": "object", "enabled": false }
+  }
+}

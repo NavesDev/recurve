@@ -177,6 +177,29 @@ class UserServiceTest {
     }
 
     @Nested
+    @DisplayName("FR-05.1 an operator is found by the email they sign in with")
+    class ByEmail {
+
+        @Test
+        void isFoundWhateverTheCaseTheEmailWasTypedIn() {
+            User ada = User.create("Ada", "ada@recurve.local", "hash", Set.of(), NOW);
+            when(repository.findByEmail("ada@recurve.local")).thenReturn(Optional.of(ada));
+
+            assertThat(service.findByEmail("  Ada@Recurve.LOCAL ")).isSameAs(ada);
+        }
+
+        @Test
+        void anUnknownEmailIsNotFound() {
+            when(repository.findByEmail("ghost@recurve.local")).thenReturn(Optional.empty());
+
+            assertThatThrownBy(() -> service.findByEmail("ghost@recurve.local"))
+                    .isInstanceOf(UserNotFoundException.class)
+                    // The message never echoes an email someone typed.
+                    .hasMessageNotContaining("ghost");
+        }
+    }
+
+    @Nested
     @DisplayName("An operator that does not exist")
     class Missing {
 

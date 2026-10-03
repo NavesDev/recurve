@@ -23,6 +23,11 @@ spring:
       ddl-auto: validate
 
 recurve:
+  auth:
+    token:
+      # A fixed key for tests only; never one a deployment uses.
+      secret: integration-tests-only-0123456789abcdef
+      ttl: 1h
   search:
     index-prefix: test-
   bootstrap:

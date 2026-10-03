@@ -4,17 +4,27 @@ import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.core.convert.converter.Converter;
 import org.springframework.http.HttpMethod;
+import org.springframework.security.authentication.AbstractAuthenticationToken;
+import org.springframework.security.config.Customizer;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.http.SessionCreationPolicy;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.security.crypto.password.PasswordEncoder;
+import org.springframework.security.oauth2.jwt.Jwt;
+import org.springframework.security.web.AuthenticationEntryPoint;
 import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.web.servlet.HandlerExceptionResolver;
 
 /**
- * HTTP Basic over a stateless chain (FR-05.1), and the one place that
- * says which permission each route needs.
+ * A token or HTTP Basic over a stateless chain (FR-05.1, FR-05.3), and
+ * the one place that says which permission each route needs.
+ *
+ * <p>The token is checked by Spring's resource server and turned into the
+ * principal by whatever {@code Converter<Jwt, …>} the application
+ * declares (the {@code auth} feature's): this class depends on that
+ * abstraction, never on the feature.
  *
  * <p>Authorization is a property of the HTTP boundary: it asks whether
  * the operator on the other side may do this. The services carry no
@@ -40,10 +50,15 @@ public class SecurityConfig {
             HttpSecurity http,
             @Qualifier("handlerExceptionResolver") HandlerExceptionResolver exceptionResolver,
             @Value("${recurve.docs.enabled:false}") boolean docsEnabled,
-            @Value("${recurve.payment.gateway:fake}") String paymentGateway) throws Exception {
+            @Value("${recurve.payment.gateway:fake}") String paymentGateway,
+            Converter<Jwt, AbstractAuthenticationToken> tokenConverter) throws Exception {
+        AuthenticationEntryPoint unauthenticated =
+                (request, response, denied) -> exceptionResolver.resolveException(request, response, null, denied);
         return http
                 // No cookie-based session to protect, and no browser form posts.
                 .csrf(csrf -> csrf.disable())
+                // NFR-10: origins from CorsConfig; none unless configured.
+                .cors(Customizer.withDefaults())
                 .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
                 .authorizeHttpRequests(requests -> {
                     // The contract is a shape, not data, and the Swagger UI has to
@@ -60,6 +75,8 @@ public class SecurityConfig {
                         requests.requestMatchers(HttpMethod.POST, "/api/webhooks/asaas").permitAll();
                     }
                     requests
+                        // FR-05.1: signing in is how a credential is obtained.
+                        .requestMatchers(HttpMethod.POST, "/api/auth/token").permitAll()
                         // FR-01.5: rebuilding an index is a system operation.
                         .requestMatchers(HttpMethod.POST, "/api/users/reindex", "/api/plans/reindex",
                                 "/api/subscribers/reindex", "/api/payments/reindex")
@@ -85,8 +102,12 @@ public class SecurityConfig {
                 // makes a browser pop its own login dialog over any client
                 // (the Swagger UI included). An API client sends credentials
                 // on every request; it needs no invitation.
-                .httpBasic(basic -> basic.authenticationEntryPoint(
-                        (request, response, denied) -> exceptionResolver.resolveException(request, response, null, denied)))
+                .httpBasic(basic -> basic.authenticationEntryPoint(unauthenticated))
+                // FR-05.3: same answer for a bad token as for bad Basic
+                // credentials, with no Bearer challenge either.
+                .oauth2ResourceServer(resourceServer -> resourceServer
+                        .jwt(jwt -> jwt.jwtAuthenticationConverter(tokenConverter))
+                        .authenticationEntryPoint(unauthenticated))
                 .exceptionHandling(handling -> handling.accessDeniedHandler(
                         (request, response, denied) -> exceptionResolver.resolveException(request, response, null, denied)))
                 .build();

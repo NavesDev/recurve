@@ -90,6 +90,13 @@ public class UserService {
         return findOrThrow(id);
     }
 
+    /** FR-05.1: the operator signs in by email, typed in any case. */
+    @Transactional(readOnly = true)
+    public User findByEmail(String email) {
+        return repository.findByEmail(UserValidator.normalizeEmail(email))
+                .orElseThrow(UserNotFoundException::byEmail);
+    }
+
     /** FR-06.1 and FR-07: search and filter, then sort, then paginate — all in the index. */
     @Transactional(readOnly = true)
     public Page<UserSummary> search(SearchFilter filter, Pageable pageable) {

@@ -19,6 +19,8 @@ import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.web.servlet.mvc.method.RequestMappingInfo;
 import org.springframework.web.servlet.mvc.method.annotation.RequestMappingHandlerMapping;
 
+import com.navesdev.recurve.auth.controller.AuthController;
+import com.navesdev.recurve.auth.service.SignInService;
 import com.navesdev.recurve.payment.controller.AsaasWebhookController;
 import com.navesdev.recurve.payment.controller.PaymentController;
 import com.navesdev.recurve.payment.gateway.AsaasProperties;
@@ -44,7 +46,7 @@ import io.swagger.v3.parser.core.models.SwaggerParseResult;
  * the document must be valid OpenAPI, and the routes it names must be
  * exactly the routes the controllers map.
  */
-@WebMvcTest(controllers = { UserController.class, PlanController.class, PriceController.class,
+@WebMvcTest(controllers = { AuthController.class, UserController.class, PlanController.class, PriceController.class,
         SubscriberController.class, PaymentController.class, AsaasWebhookController.class },
         // The webhook only exists with Asaas as the gateway; the contract describes it.
         properties = "recurve.payment.gateway=asaas")
@@ -65,6 +67,9 @@ class ApiContractTest {
 
     @Autowired
     private RequestMappingHandlerMapping handlerMapping;
+
+    @MockitoBean
+    private SignInService signInService;
 
     @MockitoBean
     private UserService userService;

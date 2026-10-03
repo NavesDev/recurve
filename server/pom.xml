@@ -47,6 +47,11 @@
 			<groupId>org.springframework.boot</groupId>
 			<artifactId>spring-boot-starter-security</artifactId>
 		</dependency>
+		<!-- FR-05.3: signs and verifies the operator's token (JWT). -->
+		<dependency>
+			<groupId>org.springframework.boot</groupId>
+			<artifactId>spring-boot-starter-security-oauth2-resource-server</artifactId>
+		</dependency>
 		<!-- The listing engine (FR-06, FR-07): search, filter, sort and
 		     pagination run here, not in PostgreSQL. -->
 		<dependency>

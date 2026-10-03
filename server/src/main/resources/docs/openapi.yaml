@@ -8,12 +8,14 @@ info:
   version: 0.0.1
   description: |
     Recurring billing and subscription management engine.
-    HTTP Basic on every request; one permission per route, `MANAGE_*` implies `VIEW_*`.
+    A token from `POST /api/auth/token` (Bearer) or HTTP Basic on every request;
+    one permission per route, `MANAGE_*` implies `VIEW_*`.
 
 servers:
   - url: /
 
 tags:
+  - name: Auth
   - name: Users
   - name: Plans
   - name: Prices
@@ -22,9 +24,63 @@ tags:
   - name: Webhooks
 
 security:
+  - bearerAuth: []
   - basicAuth: []
 
 paths:
+
+  /api/auth/token:
+
+    post:
+      tags: [Auth]
+      operationId: issueToken
+      summary: Sign in
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/TokenRequest'
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TokenResponse'
+              example:
+                token: eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiIzZjJhMWIwYyJ9.c2lnbmF0dXJl
+                expiresAt: '2026-01-15T18:00:00Z'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
+
+  /api/me:
+
+    get:
+      tags: [Auth]
+      operationId: getMe
+      summary: The signed-in operator
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MeResponse'
+              example:
+                id: 3f2a1b0c-9d8e-4f7a-8b6c-5d4e3f2a1b0c
+                name: Ada Lovelace
+                email: ada@recurve.local
+                permissions: [MANAGE_PLANS, VIEW_PLANS]
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
 
   /api/users:
 
@@ -1053,7 +1109,7 @@ paths:
       tags: [Webhooks]
       operationId: receiveAsaasEvent
       summary: Receive an event from Asaas
-      description: Called by Asaas, not by an operator. Authenticated by the `asaas-access-token` header, not by HTTP Basic. Exists only when the gateway is Asaas. Events Recurve does not act on, or about charges it does not hold, are still answered 200.
+      description: Called by Asaas, not by an operator. Authenticated by the `asaas-access-token` header, not by an operator's credentials. Exists only when the gateway is Asaas. Events Recurve does not act on, or about charges it does not hold, are still answered 200.
       security: []
       parameters:
         - name: asaas-access-token
@@ -1078,6 +1134,10 @@ paths:
 components:
 
   securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
     basicAuth:
       type: http
       scheme: basic
@@ -1236,6 +1296,48 @@ components:
         - VIEW_PAYMENTS
         - MANAGE_PAYMENTS
         - MANAGE_SYSTEM
+
+    TokenRequest:
+      type: object
+      required: [email, password]
+      properties:
+        email:
+          type: string
+          minLength: 1
+          maxLength: 255
+        password:
+          type: string
+          format: password
+          minLength: 1
+          maxLength: 72
+
+    TokenResponse:
+      type: object
+      required: [token, expiresAt]
+      properties:
+        token:
+          type: string
+        expiresAt:
+          type: string
+          format: date-time
+
+    MeResponse:
+      type: object
+      required: [id, name, email, permissions]
+      properties:
+        id:
+          type: string
+          format: uuid
+        name:
+          type: string
+        email:
+          type: string
+        permissions:
+          description: Granted permissions with BR-01 applied (MANAGE_* brings its VIEW_*).
+          type: array
+          uniqueItems: true
+          items:
+            $ref: '#/components/schemas/Permission'
 
     CreateUserRequest:
       type: object

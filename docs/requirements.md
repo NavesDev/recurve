@@ -91,9 +91,16 @@ names here are business terms, not code identifiers.
 
 - FR-05.1 Operator signs in with email and password.
 - FR-05.2 Every operation requires the corresponding permission (see BR-01).
-- FR-05.3 Sessionless: every request carries the operator's credentials
-  via HTTP Basic. A token mechanism is deferred until there is a client
-  that needs one.
+- FR-05.3 Sessionless: every request carries the operator's credentials,
+  either a token or HTTP Basic. The token is obtained by signing in
+  (FR-05.1) and expires after a configured time (default 8 hours); there
+  is no refresh, the operator signs in again. The token names the
+  operator only: their state and permissions are read on every request,
+  so a deactivation (BR-09) or a revoked permission applies at once.
+- FR-05.4 A signed-in operator can read who they are and which
+  permissions they hold, implications of BR-01 already applied. Needs no
+  permission. This is what a client uses to decide which areas and
+  actions to show; the server still checks every request.
 
 ### FR-06 Search, filter and sort
 
@@ -221,7 +228,12 @@ active ──charge fails──► past due ──payment confirmed──► act
 - NFR-08 Schema migrations with Flyway. The migration is the source of
   truth; the application only validates the mapping against it and never
   alters the schema on its own.
-- NFR-09 **[open]** Frontend: stack and scope.
+- NFR-09 Frontend: a single-page application in `web/` (React, Vite,
+  TypeScript) for operators, in Portuguese (Brazil). Scope and
+  architecture in `web/README.md`. An overview with metrics is
+  **[open]** until there are aggregate endpoints.
+- NFR-10 A browser client on another origin is allowed only from origins
+  configured in the environment; none by default.
 
 ## Out of scope for now
 

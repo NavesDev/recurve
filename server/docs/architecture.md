@@ -61,6 +61,7 @@ Arrows only point downward.
 src/main/java/com/navesdev/recurve/
 ├── RecurveApplication.java
 ├── shared/               # cross-cutting; imports no feature
+├── auth/                 # signing in: the token and who is signed in
 ├── user/
 ├── plan/
 ├── payment/
@@ -73,8 +74,10 @@ src/main/java/com/navesdev/recurve/
     └── controller/       # Controller, Request, Response
 ```
 
-Every feature follows the four subpackages. An extra subpackage only for
-external service adapters (`payment/gateway/`).
+Every feature follows the four subpackages, and omits the ones it has no
+use for: `auth/` owns no entity and no table, so it has only `service/`
+and `controller/`. An extra subpackage only for external service adapters
+(`payment/gateway/`).
 
 Cross-cutting code lives in `shared/`, laid out in the same layers as a
 feature so the dependency rule reads the same way:
@@ -290,12 +293,60 @@ the request gets here).
   }
   ```
 
+## Authentication
+
+Two ways in, one principal:
+
+| Credential | Who checks it | Use |
+|---|---|---|
+| `Authorization: Bearer <token>` | Spring's resource server, then `OperatorTokenConverter` | the web client |
+| HTTP Basic | `OperatorDetailsService` + BCrypt | the Swagger UI, scripts, tests |
+
+`POST /api/auth/token` is the sign-in (FR-05.1). `TokenService` checks
+e-mail and password through the same `OperatorDetailsService` Basic uses
+— an inactive operator is refused there (BR-09) — and signs a JWT (HS256)
+whose only claim of substance is `sub`, the operator's id. Lifetime from
+`recurve.auth.token.ttl`; no refresh token.
+
+The token says **who**, never **what they may do**. On every request
+`OperatorTokenConverter` loads the operator by `sub` and builds the
+authorities from the database, exactly as Basic does. A deactivation or a
+revoked permission therefore applies to the next request, not when the
+token expires. It costs one lookup by primary key, cheaper than the
+BCrypt check Basic pays on every call.
+
+Fail-closed at every step: a bad signature, an expired token, a `sub`
+that is not an id, an operator who no longer exists or is inactive — each
+is an `AuthenticationException`, so a 401 with the usual `ApiError`, never
+a 404 or a 500 that would tell a caller which part was wrong. The secret
+(`recurve.auth.token.secret`) must be at least 32 bytes, or the
+application does not start.
+
+`GET /api/me` (FR-05.4) answers who the principal is and their expanded
+permissions. It is the only route that needs authentication and no
+permission: everyone may know themselves. A client decides what to show
+from it; the server still decides what to allow.
+
+Exceptions stay in their layer: `TokenService` lets Spring Security's
+`AuthenticationException` through untouched (it is the language of the
+boundary), and `OperatorTokenConverter` translates the `user` feature's
+`UserNotFoundException` into one, so a domain exception never decides an
+authentication status.
+
+### CORS
+
+Off unless `recurve.cors.allowed-origins` lists origins (NFR-10). The web
+client in development goes through Vite's proxy and needs none. Listed
+origins get the API's methods and the `Authorization` and `Content-Type`
+headers, without credentials: the token travels in a header, not a
+cookie.
+
 ## Authorization
 
-Spring Security, HTTP Basic, and **one rule per route family** in
-`SecurityConfig`:
+Spring Security and **one rule per route family** in `SecurityConfig`:
 
 ```java
+.requestMatchers(HttpMethod.POST, "/api/auth/token").permitAll()
 .requestMatchers(HttpMethod.POST, "/api/webhooks/asaas").permitAll()   // only with Asaas; token checked in the controller
 .requestMatchers(HttpMethod.POST, "/api/users/reindex", "/api/plans/reindex", "/api/subscribers/reindex",
         "/api/payments/reindex").hasAuthority("MANAGE_SYSTEM")
@@ -309,12 +360,14 @@ Spring Security, HTTP Basic, and **one rule per route family** in
 .anyRequest().authenticated()
 ```
 
-- The `User`'s `Permission`s become `GrantedAuthority`s at login.
+- The `User`'s `Permission`s become `GrantedAuthority`s on every request,
+  whichever credential carried it.
 - `MANAGE_*` implies `VIEW_*`: resolved when building the principal's
   authorities, not in the rule. A rule always names **one** permission.
 - Most specific route first; Spring Security takes the first match.
-- An inactive operator (BR-09) is blocked in `UserDetailsService`:
-  `enabled=false`.
+- An inactive operator (BR-09) is blocked in `UserDetailsService`
+  (`enabled=false`) for Basic and the sign-in, and in
+  `OperatorTokenConverter` for a token.
 
 Authorization is a question about the **HTTP boundary**: may the operator
 on the other side do this? So it is answered there, and nowhere else.
@@ -585,7 +638,7 @@ takes or returns is a change to the contract first.
 The document is only displayed. `shared/config/DocsConfig` serves it and
 a Swagger UI over it under `/docs`, to anyone: the contract is a shape,
 not data, and the UI has to fetch it before any credential exists. A call
-made through the UI still needs Basic Auth. `recurve.docs.enabled` is one
+made through the UI still needs credentials. `recurve.docs.enabled` is one
 switch for all of it — off, `DocsConfig` does not exist, `/docs` is not
 mapped and falls under the default `authenticated()` rule, so a stranger
 gets a 401 rather than a 404. Production turns it off.
@@ -647,6 +700,7 @@ Two source roots, so that the unit suite never needs a server:
 | JPA persistence | testIntegration | real database (`@DataJpaTest`) | lookups, custom queries |
 | Search persistence | testIntegration | real node (`@DataElasticsearchTest`) | the listing rules FR-06, FR-07 on the mapped index |
 | Authorization | testIntegration | `@SpringBootTest` + HTTP Basic | the route rules in `SecurityConfig` |
+| Authentication | testIntegration | `@SpringBootTest` + a real token | sign-in, Bearer and Basic on one route, a token outliving its operator, CORS |
 | Contract | test + testIntegration | parser; `@SpringBootTest` + the request validator | the document is valid and names the mapped routes; real exchanges match it |
 | Docs | testIntegration | `@SpringBootTest` with the property on and off | `/docs` is open when enabled and absent when not |
 | Fail-fast | testIntegration | `@SpringBootTest`, search repository mocked to fail | the rollback the transaction promises |

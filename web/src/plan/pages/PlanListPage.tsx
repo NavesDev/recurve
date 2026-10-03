@@ -8,7 +8,7 @@ import { SEARCH_DEBOUNCE_MS } from '../../shared/constants/query';
 import { ROUTES } from '../../shared/constants/routes';
 import { ButtonLink } from '../../shared/design/Button';
 import { DataTable, type Column } from '../../shared/design/DataTable';
-import { Alert, Cell, Page, PageHeader, SearchInput, Toolbar } from '../../shared/design/Layout';
+import { Alert, Cell, FilterSelect, Page, PageHeader, SearchInput, Toolbar } from '../../shared/design/Layout';
 import { Menu } from '../../shared/design/Menu';
 import { Pagination } from '../../shared/design/Pagination';
 import { formatDate } from '../../shared/format/date';
@@ -62,17 +62,17 @@ export function PlanListPage() {
       />
       <Toolbar>
         <SearchInput label="Buscar planos" placeholder="Buscar por nome…" value={search} onChange={(event) => setSearch(event.target.value)} />
-        <select aria-label="Filtrar por ciclo" className={styles.filter} value={listing.filters.activeIntervals?.[0] ?? ''}
+        <FilterSelect label="Filtrar por ciclo" value={listing.filters.activeIntervals?.[0] ?? ''}
           onChange={(event) => setFilter('activeIntervals', event.target.value ? [event.target.value] : [])}>
           <option value="">Todos os ciclos</option>
           {INTERVAL_ORDER.map((interval) => <option key={interval} value={interval}>Com preço {INTERVAL_LABEL[interval].toLowerCase()}</option>)}
-        </select>
-        <select aria-label="Filtrar por status" className={styles.filter} value={listing.filters.active?.[0] ?? ''}
+        </FilterSelect>
+        <FilterSelect label="Filtrar por status" value={listing.filters.active?.[0] ?? ''}
           onChange={(event) => setFilter('active', event.target.value ? [event.target.value] : [])}>
           <option value="">Ativos e inativos</option>
           <option value="true">Só ativos</option>
           <option value="false">Só inativos</option>
-        </select>
+        </FilterSelect>
       </Toolbar>
       {plans.isError && <Alert>{describeError(plans.error)}</Alert>}
       <DataTable

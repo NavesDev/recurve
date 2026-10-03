@@ -44,8 +44,13 @@ export function inactivePrices(plan: Plan): Price[] {
   return plan.prices.filter((price) => !price.active).sort((a, b) => b.createdAt.localeCompare(a.createdAt));
 }
 
+/** "R$ 49,90/mês": an amount and the cycle it is charged in. */
+export function amountPerInterval(amount: number, currency: string, interval: BillingInterval): string {
+  return `${formatMoney(amount, currency)}/${INTERVAL_UNIT[interval]}`;
+}
+
 export function priceLabel(price: Price): string {
-  return `${formatMoney(price.price, price.currency)}/${INTERVAL_UNIT[price.interval]}`;
+  return amountPerInterval(price.price, price.currency, price.interval);
 }
 
 export function priceSummary(plan: Plan): string {

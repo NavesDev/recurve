@@ -1,7 +1,7 @@
 import { useNavigate, useParams } from 'react-router';
 import { LoadingScreen, StatusScreen } from '../../auth';
-import { ApiError } from '../../shared/api/ApiError';
 import { describeError } from '../../shared/api/describeError';
+import { isFormLevelError } from '../../shared/api/formErrors';
 import { ROUTES } from '../../shared/constants/routes';
 import { Alert, Page, PageHeader } from '../../shared/design/Layout';
 import { useToast } from '../../shared/design/Toast';
@@ -16,7 +16,7 @@ export function PlanNewPage() {
   return (
     <Page>
       <PageHeader title="Novo plano" back={{ to: ROUTES.plans, label: 'Planos' }} />
-      {create.isError && !(create.error instanceof ApiError && create.error.fieldErrors.length) && <Alert>{describeError(create.error)}</Alert>}
+      {isFormLevelError(create.error) && <Alert>{describeError(create.error)}</Alert>}
       <PlanForm
         submitLabel="Criar plano" busy={create.isPending} error={create.error}
         onCancel={() => navigate(ROUTES.plans)}
@@ -45,7 +45,7 @@ export function PlanEditPage() {
   return (
     <Page>
       <PageHeader title="Editar plano" back={{ to: ROUTES.planDetail(id), label: plan.data.name }} />
-      {update.isError && !(update.error instanceof ApiError && update.error.fieldErrors.length) && <Alert>{describeError(update.error)}</Alert>}
+      {isFormLevelError(update.error) && <Alert>{describeError(update.error)}</Alert>}
       <PlanForm
         initial={{ name: plan.data.name, description: plan.data.description }}
         submitLabel="Salvar" busy={update.isPending} error={update.error}

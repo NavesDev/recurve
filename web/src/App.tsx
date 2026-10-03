@@ -3,12 +3,12 @@ import { createBrowserRouter, Link, RouterProvider, type RouteObject } from 'rea
 import { AuthBridge, authRoutes, can, StatusScreen, useMe } from './auth';
 import { OverviewPage, overviewNav } from './overview';
 import { ApiError } from './shared/api/ApiError';
-import { paymentNav } from './payment';
+import { paymentNav, paymentRoutes } from './payment';
 import { planNav, planRoutes } from './plan';
 import { ROUTES } from './shared/constants/routes';
 import { ToastProvider } from './shared/design/Toast';
 import { Shell } from './Shell';
-import { subscriberNav } from './subscriber';
+import { subscriberNav, subscriberRoutes } from './subscriber';
 import { systemNav } from './system';
 import { userNav } from './user';
 
@@ -43,6 +43,8 @@ const routes: RouteObject[] = [
     children: [
       { index: true, element: <Overview />, handle: { section: overviewNav.label } },
       ...planRoutes,
+      ...subscriberRoutes,
+      ...paymentRoutes,
       { path: '*', element: <NotFound /> },
     ],
   },

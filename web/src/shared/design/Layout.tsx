@@ -105,3 +105,36 @@ export function Stack({ as = 'div', wide, narrow, children, ...rest }: StackProp
   if (as === 'form') return <form {...rest} className={className}>{children}</form>;
   return <div className={className}>{children}</div>;
 }
+
+interface FilterChipsProps<T extends string> {
+  label: string;
+  options: readonly { value: T; label: string }[];
+  selected: readonly string[];
+  onChange: (selected: T[]) => void;
+}
+
+/** A filter of several values at once (FR-06: values of one filter combine with OR). */
+export function FilterChips<T extends string>({ label, options, selected, onChange }: FilterChipsProps<T>) {
+  return (
+    <div role="group" aria-label={label} className={styles.chips}>
+      <span className={styles.chipsLabel} aria-hidden="true">{label}:</span>
+      {options.map((option) => {
+        const on = selected.includes(option.value);
+        return (
+          <button key={option.value} type="button" className={styles.chip} aria-pressed={on}
+            onClick={() => onChange(on
+              ? options.filter((o) => o.value !== option.value && selected.includes(o.value)).map((o) => o.value)
+              : options.filter((o) => o.value === option.value || selected.includes(o.value)).map((o) => o.value))}>
+            {option.label}
+          </button>
+        );
+      })}
+    </div>
+  );
+}
+
+/** A compact select for a toolbar filter. */
+export function FilterSelect(props: React.SelectHTMLAttributes<HTMLSelectElement> & { label: string }) {
+  const { label, children, ...rest } = props;
+  return <select aria-label={label} className={styles.select} {...rest}>{children}</select>;
+}

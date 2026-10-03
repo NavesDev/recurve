@@ -2,10 +2,10 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useSyncExternalStore } from 'react';
 import { http } from '../shared/api/http';
 import { sessionStore, type Session } from '../shared/api/session';
-import { ME_STALE_TIME } from '../shared/constants/query';
+import { ME_STALE_TIME, QUERY_ROOTS } from '../shared/constants/query';
 import type { IssuedToken, Me } from './domain';
 
-export const meKey = ['me'] as const;
+export const meKey = [QUERY_ROOTS.me] as const;
 
 export function useSession(): Session | null {
   return useSyncExternalStore(sessionStore.subscribe, sessionStore.get);

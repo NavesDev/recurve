@@ -1,11 +1,12 @@
 import { keepPreviousData, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { http } from '../shared/api/http';
 import { toSearchParams, type Listing, type Page } from '../shared/api/listing';
+import { QUERY_ROOTS } from '../shared/constants/query';
 import { PLAN_LISTING, PLAN_LOOKUP_SIZE } from './constants';
 import type { Plan, PlanInput, Price, PriceInput } from './domain';
 
 export const planKeys = {
-  all: ['plans'] as const,
+  all: [QUERY_ROOTS.plans] as const,
   list: (listing: Listing) => [...planKeys.all, 'list', listing] as const,
   lookup: () => [...planKeys.all, 'lookup'] as const,
   detail: (id: string) => [...planKeys.all, 'detail', id] as const,

@@ -19,3 +19,8 @@ export function applyFieldErrors<T extends FieldValues>(
   }
   return all;
 }
+
+/** A failure to show above the form: any but a refusal whose field errors the fields already show. */
+export function isFormLevelError(error: unknown): boolean {
+  return Boolean(error) && !(error instanceof ApiError && error.fieldErrors.length > 0);
+}

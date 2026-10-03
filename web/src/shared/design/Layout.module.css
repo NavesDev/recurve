@@ -36,3 +36,18 @@
 .stack { display: flex; flex-direction: column; gap: var(--rc-space-4); min-width: 0; }
 .stackWide { gap: var(--rc-space-5); }
 .narrow { max-width: 680px; }
+.chips { display: inline-flex; gap: 6px; flex-wrap: wrap; align-items: center; }
+.chipsLabel { font-size: var(--rc-size-support); color: var(--rc-ink-2); margin-right: 2px; }
+.chip {
+  height: 32px; padding: 0 12px; border-radius: var(--rc-radius-pill); border: 1px solid var(--rc-border-field);
+  background: var(--rc-surface); color: var(--rc-ink-2); font-size: 13px; font-weight: 500; cursor: pointer;
+}
+.chip:hover { background: var(--rc-fill); }
+.chip[aria-pressed='true'] { background: var(--rc-action-soft); border-color: transparent; color: var(--rc-action-ink); font-weight: 600; }
+.select {
+  height: 36px; padding: 0 30px 0 12px; font-size: 14px; color: var(--rc-ink); border: 1px solid var(--rc-border-field);
+  border-radius: var(--rc-radius-field); background: var(--rc-surface); appearance: none;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' fill='none' stroke='%236e6e73' stroke-width='1.5'%3E%3Cpath d='M3 4.8L6 7.8l3-3'/%3E%3C/svg%3E");
+  background-repeat: no-repeat; background-position: right 10px center;
+}
+.select:focus { outline: none; box-shadow: 0 0 0 3px var(--rc-action-ring); }

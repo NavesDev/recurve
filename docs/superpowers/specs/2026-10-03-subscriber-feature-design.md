@@ -24,6 +24,8 @@ a `Subscriber`. Follows the patterns the `user` and `plan` features set
 | Sort by billed amount | `price` mapped as `scaled_float` (`scaling_factor: 100`), written as a string so it never passes through a `double`. Sorting mixes currencies; combining with `filter=currency:BRL` is the caller's choice. |
 | "May this price take a new subscriber" | A rule of the `Plan` aggregate (`plan.subscribablePrice`), not of the service: active plan **and** active price (FR-02.3, FR-02.4). |
 | Cancel route | `DELETE /api/subscribers/{id}` cancels, consistent with `DELETE` deactivating in `user` and `plan`. Nothing is deleted. |
+| What a use case returns | `SubscriberSummary`, not the entity. The response shows the price's plan, amount and cycle, and a controller may not call the plan feature; the summary already carries them. |
+| Default sort `startedAt` descending | `@Listing(defaultSort)` is spelled as `sort` is, so `"startedAt:desc"`. Until now a default was always ascending. |
 | Unique violation in the database | `DataIntegrityViolationException` → 409 in `GlobalExceptionHandler`. Today it is a 500 in `user` too; this fixes both. |
 
 ## Domain
@@ -111,10 +113,10 @@ already lists them.
 write goes to PostgreSQL and to the index in one transaction (fail-fast).
 
 ```java
-Subscriber create(CreateSubscriberCommand)   // name, email, planPriceId
-Subscriber update(UpdateSubscriberCommand)   // id, name, email
-Subscriber cancel(UUID id)
-Subscriber findById(UUID id)
+SubscriberSummary create(CreateSubscriberCommand)   // name, email, planPriceId
+SubscriberSummary update(UpdateSubscriberCommand)   // id, name, email
+SubscriberSummary cancel(UUID id)
+SubscriberSummary findById(UUID id)
 Page<SubscriberSummary> search(SearchFilter, Pageable)
 long reindex()
 ```
@@ -136,7 +138,7 @@ long reindex()
 
 ```java
 Plan findForSubscription(UUID priceId)          // plan.subscribablePrice(priceId) or throws
-Map<UUID, Plan> findByPriceIds(Set<UUID> ids)   // price id → its plan
+Map<UUID, Plan> findByPriceIds(Set<UUID> ids)   // price id → its plan; a price nobody holds throws
 ```
 
 Both return the `Plan`, not the `PlanPrice`: the summary needs the

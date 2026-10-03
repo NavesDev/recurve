@@ -147,16 +147,16 @@ public class Subscriber {
     // ... fields, protected constructor for JPA
 
     public static Subscriber start(String name, String email, PlanPrice price, Instant now) {
-        var s = new Subscriber();
-        s.id = UUID.randomUUID();
-        s.planPriceId = price.getId();
-        s.name = name;
-        s.email = email;
-        s.status = SubscriberStatus.ACTIVE;
-        s.startedAt = now;
-        s.nextBillingAt = price.getInterval().advance(now);
-        s.createdAt = now;
-        return s;
+        Subscriber subscriber = new Subscriber();
+        subscriber.id = UUID.randomUUID();
+        subscriber.planPriceId = price.getId();
+        subscriber.name = SubscriberValidator.name(name);
+        subscriber.email = SubscriberValidator.email(email);
+        subscriber.status = SubscriberStatus.ACTIVE;
+        subscriber.startedAt = now;
+        subscriber.nextBillingAt = price.getInterval().advance(now);
+        subscriber.createdAt = now;
+        return subscriber;
     }
 
     public void cancel(Instant now) {
@@ -167,6 +167,7 @@ public class Subscriber {
         canceledAt = now;
     }
 
+    // arrives with the payment feature (FR-04.2)
     public void confirmPayment(BillingInterval interval) {
         status = SubscriberStatus.ACTIVE;
         nextBillingAt = interval.advance(nextBillingAt);
@@ -230,7 +231,7 @@ Before step 2 the service also:
 - Validates rules that depend on the database or on another entity
   (email uniqueness, active price).
 - Fetches from another feature whatever the domain rule needs
-  (`planService.findActivePrice`).
+  (`planService.findForSubscription`).
 
 Does not: validate format (Bean Validation on the request), serialize
 HTTP, hold `if`s for rules that belong in the entity.
@@ -240,26 +241,30 @@ HTTP, hold `if`s for rules that belong in the entity.
 @Transactional
 public class SubscriberService {
 
-    public Subscriber create(CreateSubscriberCommand cmd) {
-        if (repository.existsByEmail(cmd.email())) {
-            throw new EmailAlreadyInUseException(cmd.email());
+    public SubscriberSummary create(CreateSubscriberCommand cmd) {
+        String email = SubscriberValidator.normalizeEmail(cmd.email());
+        if (repository.existsByEmail(email)) {
+            throw new SubscriberEmailAlreadyInUseException(email);
         }
-        PlanPrice price = planService.findActivePrice(cmd.planPriceId());
-        Subscriber subscriber = Subscriber.start(cmd.name(), cmd.email(), price, clock.instant());
-        return repository.save(subscriber);
+        Plan plan = planService.findForSubscription(cmd.planPriceId());
+        Subscriber subscriber = Subscriber.start(cmd.name(), email, plan.price(cmd.planPriceId()), clock.instant());
+        return persist(subscriber, plan);
     }
 
-    public Subscriber cancel(UUID id) {
+    public SubscriberSummary cancel(UUID id) {
         Subscriber subscriber = findOrThrow(id);   // 1
         subscriber.cancel(clock.instant());        // 2
-        return repository.save(subscriber);        // 3
+        return persist(subscriber, planOf(subscriber));   // 3
     }
 }
 ```
 
 Service input is a command `record` (`CreateSubscriberCommand`), ids, or a
 filter `record`. An HTTP request never reaches the service. Output is the
-entity (or `Page<Entity>`).
+entity (or `Page<Entity>`) — unless the response needs another
+feature's data. A controller may not call another feature, so the
+service answers with the read model instead: `SubscriberService` returns
+`SubscriberSummary`, which carries the price the subscriber pays.
 
 ### Presentation (`controller/`)
 
@@ -273,7 +278,7 @@ the request gets here).
 - Listing: one argument, `@Listing(defaultSort = "...") ListingRequest`,
   resolved by `shared/controller/ListingRequestResolver` from the five
   query parameters every listing shares; the controller only names the
-  feature's default sort field and gets back a `SearchFilter` and a
+  feature's default sort, spelled as `sort` is (`"startedAt:desc"`), and gets back a `SearchFilter` and a
   `Pageable`. Response as `PageResponse<T>`.
 
   ```java
@@ -289,10 +294,13 @@ Spring Security, HTTP Basic, and **one rule per route family** in
 `SecurityConfig`:
 
 ```java
-.requestMatchers(HttpMethod.POST, "/api/users/reindex", "/api/plans/reindex").hasAuthority("MANAGE_SYSTEM")
+.requestMatchers(HttpMethod.POST, "/api/users/reindex", "/api/plans/reindex", "/api/subscribers/reindex")
+        .hasAuthority("MANAGE_SYSTEM")
 .requestMatchers("/api/users/**").hasAuthority("MANAGE_USERS")
 .requestMatchers(HttpMethod.GET, "/api/plans/**").hasAuthority("VIEW_PLANS")
 .requestMatchers("/api/plans/**", "/api/prices/**").hasAuthority("MANAGE_PLANS")
+.requestMatchers(HttpMethod.GET, "/api/subscribers/**").hasAuthority("VIEW_SUBSCRIBERS")
+.requestMatchers("/api/subscribers/**").hasAuthority("MANAGE_SUBSCRIBERS")
 .anyRequest().authenticated()
 ```
 
@@ -425,8 +433,9 @@ Security — not the handler — that answers 401. Anything unmapped is a
    `CreateSubscriberRequest`.
 3. `request.toCommand()` produces `CreateSubscriberCommand`.
 4. `SubscriberService.create(command)`: validates email uniqueness, fetches
-   the `PlanPrice` via `PlanService`, calls `Subscriber.start(...)`, saves.
-5. `SubscriberResponse.from(subscriber)`. `201`.
+   the plan holding the price via `PlanService.findForSubscription`, calls
+   `Subscriber.start(...)`, saves and indexes.
+5. `SubscriberResponse.from(summary)`. `201`.
 
 Errors propagate as exceptions and `GlobalExceptionHandler` translates
 them.
@@ -442,12 +451,12 @@ Every listing takes the same query parameters and answers with
 | `filter` | — | repeatable, `field:value` or `field:value1,value2` |
 | `page` | `0` | zero-based page number |
 | `size` | `20` | page size, maximum 100 |
-| `sort` | the feature's default, ascending | `field[:asc\|desc]`, comma-separated, each field named as the index names it; no direction means `asc` |
+| `sort` | the feature's default (subscribers: `startedAt:desc`) | `field[:asc\|desc]`, comma-separated, each field named as the index names it; no direction means `asc` |
 
 ```
 ?q=ada&filter=active:true&sort=email.keyword:desc&page=0&size=20
 ?sort=active:desc,name.keyword:asc
-?filter=status:ACTIVE,PAST_DUE&filter=plan=<id>
+?filter=status:ACTIVE,PAST_DUE&filter=planId:<id>
 ```
 
 Filtering is **one repeatable parameter, not one parameter per field**.
@@ -657,7 +666,7 @@ the aggregate cannot be persisted at all.
 |---|---|
 | operators and their permissions | `V1__create_users.sql` |
 | plans and their prices | `V2__create_plans.sql` |
-| subscribers | a separate one |
+| subscribers | `V3__create_subscribers.sql` |
 | payments | a separate one |
 | an index added to an existing table | a separate one |
 
@@ -684,6 +693,15 @@ The plan index follows the same pattern: `search/plans-settings.json`,
 `plans-mapping.json`, `PlanIndexBootstrap`, `POST /api/plans/reindex`.
 Its `activeIntervals` field is derived in `PlanSummary` so that "a plan
 with an active price in this cycle" is a plain `terms` filter.
+
+The subscriber index too: `search/subscribers-settings.json`,
+`subscribers-mapping.json`, `SubscriberIndexBootstrap`,
+`POST /api/subscribers/reindex`. `SubscriberSummary` copies the plan,
+amount, currency and cycle of the subscriber's price, so "subscribers of
+a plan" is a filter and "by amount" a sort. The copy never goes stale: a
+price never changes them (BR-04) and a subscriber never changes price.
+The amount is written as text and mapped as `scaled_float`, so it sorts
+as a number without passing through a `double`.
 
 `spring.elasticsearch.uris` follows the same placeholder pattern as the
 datasource (`${ES_URL:http://localhost:9230}`). Integration tests share

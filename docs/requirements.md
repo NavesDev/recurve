@@ -55,6 +55,8 @@ names here are business terms, not code identifiers.
 - FR-03.4 List subscribers (see FR-06.3).
 - FR-03.5 **[open]** Move a subscriber to another price (upgrade/downgrade).
 - FR-03.6 **[open]** Reactivate a canceled subscriber.
+- FR-03.7 Edit a subscriber's name and email. The email stays unique
+  (BR-02). A canceled subscriber cannot be edited.
 
 ### FR-04 Payments
 
@@ -125,6 +127,8 @@ on every write and rebuildable from it on request (FR-01.5).
 - Filter by plan: subscriber whose price belongs to the plan.
 - Sort by start date.
 - Sort by billed amount: amount of the price the subscriber is linked to.
+  Amounts in different currencies sort as plain numbers; filter by
+  currency to compare like with like.
 - Default sort: start date descending.
 
 ### FR-07 Pagination
@@ -150,7 +154,8 @@ Offset-based.
   operators may change them, since a read-only view of who runs the
   system serves nobody. One more permission, `MANAGE_SYSTEM`, covers
   operational routines (rebuilding a search index) and implies nothing.
-- BR-02 Operator email is unique. Subscriber email is unique.
+- BR-02 Operator email is unique. Subscriber email is unique, canceled
+  subscribers included.
 - BR-03 A plan has no price of its own; amount and cycle live in the
   price. A plan may have several active prices, at most one per
   (cycle, currency).

@@ -4,7 +4,7 @@ import { AuthBridge, authRoutes, can, StatusScreen, useMe } from './auth';
 import { OverviewPage, overviewNav } from './overview';
 import { ApiError } from './shared/api/ApiError';
 import { paymentNav } from './payment';
-import { planNav } from './plan';
+import { planNav, planRoutes } from './plan';
 import { ROUTES } from './shared/constants/routes';
 import { ToastProvider } from './shared/design/Toast';
 import { Shell } from './Shell';
@@ -42,6 +42,7 @@ const routes: RouteObject[] = [
     element: <Shell />,
     children: [
       { index: true, element: <Overview />, handle: { section: overviewNav.label } },
+      ...planRoutes,
       { path: '*', element: <NotFound /> },
     ],
   },

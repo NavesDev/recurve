@@ -33,3 +33,6 @@
 .mono { font-family: var(--rc-mono); font-size: 14px; white-space: nowrap; }
 .alert { padding: 12px 16px; border-radius: var(--rc-radius-field); background: var(--rc-danger-soft); color: var(--rc-danger-ink); font-size: 14px; }
 .warnAlert { background: var(--rc-warn-soft); color: var(--rc-warn-ink); }
+.stack { display: flex; flex-direction: column; gap: var(--rc-space-4); min-width: 0; }
+.stackWide { gap: var(--rc-space-5); }
+.narrow { max-width: 680px; }

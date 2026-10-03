@@ -92,3 +92,16 @@ export function Mono({ children }: { children: ReactNode }) {
 export function Alert({ tone = 'danger', children }: { tone?: 'danger' | 'warn'; children: ReactNode }) {
   return <div role="alert" className={`${styles.alert} ${tone === 'warn' ? styles.warnAlert : ''}`}>{children}</div>;
 }
+
+interface StackProps extends React.FormHTMLAttributes<HTMLFormElement> {
+  as?: 'div' | 'form';
+  wide?: boolean;
+  narrow?: boolean;
+}
+
+/** Children in a column, spaced by the tokens. `as="form"` for a form. */
+export function Stack({ as = 'div', wide, narrow, children, ...rest }: StackProps) {
+  const className = [styles.stack, wide && styles.stackWide, narrow && styles.narrow].filter(Boolean).join(' ');
+  if (as === 'form') return <form {...rest} className={className}>{children}</form>;
+  return <div className={className}>{children}</div>;
+}

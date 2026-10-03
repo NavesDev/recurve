@@ -1,3 +1,4 @@
+import { Link, type LinkProps } from 'react-router';
 import type { ButtonHTMLAttributes } from 'react';
 import styles from './Button.module.css';
 
@@ -18,4 +19,13 @@ export function Button({ variant = 'primary', size = 'regular', busy = false, di
       {children}
     </button>
   );
+}
+
+interface ButtonLinkProps extends LinkProps {
+  variant?: ButtonVariant;
+}
+
+/** Navigation that looks like a button: still a link to assistive technology. */
+export function ButtonLink({ variant = 'primary', className, ...rest }: ButtonLinkProps) {
+  return <Link {...rest} className={[styles.button, styles[variant], className].filter(Boolean).join(' ')} />;
 }

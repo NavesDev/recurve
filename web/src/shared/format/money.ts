@@ -9,3 +9,16 @@ export function formatMoney(amount: number, currency: string): string {
   }
   return formatter.format(amount);
 }
+
+const AMOUNT = /^\d+(\.\d{1,2})?$/;
+
+/**
+ * An amount as an operator types it: `1.299,90` the Brazilian way, or
+ * `49.9` with a decimal point. Null for anything that is not a
+ * non-negative amount with at most two decimal places (NFR-06).
+ */
+export function parseMoney(text: string): number | null {
+  const trimmed = text.trim();
+  const normalized = trimmed.includes(',') ? trimmed.replace(/\./g, '').replace(',', '.') : trimmed;
+  return AMOUNT.test(normalized) ? Number(normalized) : null;
+}

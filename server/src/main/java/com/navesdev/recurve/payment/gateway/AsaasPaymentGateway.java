@@ -4,6 +4,7 @@ import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.ZoneOffset;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
 import java.util.function.Supplier;
@@ -33,6 +34,16 @@ import com.navesdev.recurve.subscriber.domain.Subscriber;
  * in a client's error message.
  */
 public class AsaasPaymentGateway implements PaymentGateway {
+
+    /** Asaas's charge statuses, as documented, onto the states Recurve acts on. */
+    private static final Map<String, ChargeState> STATES = Map.of(
+            "PENDING", ChargeState.PENDING,
+            "AWAITING_RISK_ANALYSIS", ChargeState.PENDING,
+            "RECEIVED", ChargeState.PAID,
+            "CONFIRMED", ChargeState.PAID,
+            "RECEIVED_IN_CASH", ChargeState.PAID,
+            "OVERDUE", ChargeState.OVERDUE,
+            "REFUNDED", ChargeState.REFUNDED);
 
     private final RestClient client;
 
@@ -80,6 +91,19 @@ public class AsaasPaymentGateway implements PaymentGateway {
     }
 
     @Override
+    public ChargeState chargeState(String externalId) {
+        Status found = call("read charge", () -> client.get().uri("/payments/{id}", externalId)
+                .retrieve()
+                .body(Status.class));
+        return stateOf(found.status());
+    }
+
+    /** Any status not listed — a refund in progress, a chargeback — is {@link ChargeState#OTHER}. */
+    private static ChargeState stateOf(String status) {
+        return STATES.getOrDefault(status == null ? "" : status, ChargeState.OTHER);
+    }
+
+    @Override
     public void receiveInCash(String externalId, BigDecimal amount, LocalDate paidOn) {
         call("receive in cash", () -> client.post().uri("/payments/{id}/receiveInCash", externalId)
                 .contentType(MediaType.APPLICATION_JSON)
@@ -122,5 +146,8 @@ public class AsaasPaymentGateway implements PaymentGateway {
     }
 
     record Found(List<Created> data) {
+    }
+
+    record Status(String status) {
     }
 }

@@ -992,6 +992,39 @@ paths:
         '503':
           $ref: '#/components/responses/ServiceUnavailable'
 
+  /api/payments/{id}/sync:
+
+    parameters:
+      - $ref: '#/components/parameters/paymentId'
+
+    post:
+      tags: [Payments]
+      operationId: syncPayment
+      summary: Bring a charge up to date with the payment gateway
+      description: Asks the gateway where the charge stands and applies the same rule as the webhook (paid, overdue, refunded). For when the webhook did not arrive or cannot reach the server. An unsent charge is returned as it is.
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaymentResponse'
+              examples:
+                payment:
+                  $ref: '#/components/examples/payment'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
+        '502':
+          $ref: '#/components/responses/BadGateway'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
+
   /api/payments/reindex:
 
     post:

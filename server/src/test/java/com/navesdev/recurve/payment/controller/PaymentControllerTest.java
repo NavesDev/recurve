@@ -123,15 +123,17 @@ class PaymentControllerTest {
     class Acting {
 
         @Test
-        void sendConfirmAndRefundAnswerWithThePayment() throws Exception {
+        void sendConfirmRefundAndSyncAnswerWithThePayment() throws Exception {
             UUID id = UUID.randomUUID();
             when(service.send(id)).thenReturn(sent());
             when(service.confirm(id)).thenReturn(sent());
             when(service.refund(id)).thenReturn(sent());
+            when(service.sync(id)).thenReturn(sent());
 
             mvc.perform(post("/api/payments/{id}/send", id)).andExpect(status().isOk());
             mvc.perform(post("/api/payments/{id}/confirm", id)).andExpect(status().isOk());
             mvc.perform(post("/api/payments/{id}/refund", id)).andExpect(status().isOk());
+            mvc.perform(post("/api/payments/{id}/sync", id)).andExpect(status().isOk());
         }
 
         @Test

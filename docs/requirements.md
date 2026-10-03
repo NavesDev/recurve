@@ -80,7 +80,10 @@ names here are business terms, not code identifiers.
   chooses Pix, boleto or card on the gateway's invoice page), receive the
   confirmation/failure webhook, match the payment by our id carried as the
   gateway's external reference or by the gateway's id. A charge the gateway
-  did not take can be sent again without charging twice.
+  did not take can be sent again without charging twice. A charge can also
+  be brought up to date on request, by asking the gateway where it stands
+  (for when the webhook did not arrive or cannot reach the server); the
+  same rule applies as for the webhook.
 - FR-04.8 **[open]** Retry policy and grace period before a past-due
   subscriber is canceled.
 

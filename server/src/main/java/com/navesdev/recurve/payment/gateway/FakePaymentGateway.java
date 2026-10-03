@@ -38,6 +38,12 @@ public class FakePaymentGateway implements PaymentGateway {
         return Optional.ofNullable(charges.get(paymentId));
     }
 
+    /** Nobody pays a fake charge: it is awaiting payment for as long as it exists. */
+    @Override
+    public ChargeState chargeState(String externalId) {
+        return ChargeState.PENDING;
+    }
+
     @Override
     public void receiveInCash(String externalId, BigDecimal amount, LocalDate paidOn) {
         // Nothing to tell: nobody was being charged.

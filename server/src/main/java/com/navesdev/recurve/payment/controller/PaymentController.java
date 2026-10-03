@@ -64,6 +64,12 @@ public class PaymentController {
         return PaymentResponse.from(service.refund(id));
     }
 
+    /** FR-04.7: asks the gateway where the charge stands, for when its webhook did not arrive. */
+    @PostMapping("/{id}/sync")
+    public PaymentResponse sync(@PathVariable UUID id) {
+        return PaymentResponse.from(service.sync(id));
+    }
+
     @GetMapping("/{id}")
     public PaymentResponse findById(@PathVariable UUID id) {
         return PaymentResponse.from(service.findById(id));

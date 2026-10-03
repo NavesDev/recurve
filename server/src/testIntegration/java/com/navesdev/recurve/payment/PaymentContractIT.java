@@ -150,6 +150,7 @@ class PaymentContractIT {
     @Test
     void sendsConfirmsAndRefunds() throws Exception {
         mvc.perform(post("/api/payments/{id}/send", paymentId).with(manager())).andExpect(status().isOk()).andExpect(CONTRACT);
+        mvc.perform(post("/api/payments/{id}/sync", paymentId).with(manager())).andExpect(status().isOk()).andExpect(CONTRACT);
         mvc.perform(post("/api/payments/{id}/confirm", paymentId).with(manager())).andExpect(status().isOk()).andExpect(CONTRACT);
         mvc.perform(post("/api/payments/{id}/confirm", paymentId).with(manager()))
                 .andExpect(status().isUnprocessableEntity()).andExpect(CONTRACT);

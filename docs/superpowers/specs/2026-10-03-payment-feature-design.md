@@ -25,6 +25,7 @@ refund, and the search-index listing. Follows the patterns `user`,
 | A late payment | Asaas accepts payment of an overdue charge. `FAILED → PAID` is allowed: the subscriber becomes active and its next billing date advances. |
 | A refund | Changes the payment only. Ending the subscription is a separate cancel. |
 | A canceled subscriber that pays | The payment is recorded; the subscriber stays canceled and its next billing date does not move. |
+| A webhook that never arrives (no public URL, server down) | `POST /api/payments/{id}/sync` asks the gateway where the charge stands (`GET /payments/{id}`) and applies the same rule as the webhook. Added after the design review, so the sandbox can be exercised without a tunnel; a polling job, when jobs exist, calls it. |
 | Unknown payment in a webhook | Answered 200 and logged, so Asaas does not pause the queue over a charge Recurve does not hold. |
 | Concurrent writes on one payment | `@Version`: a webhook and an operator can race. A lost race is a 409. |
 | Listing (FR-04.6) | A `payments` index. The subscriber's name is not copied (it changes, FR-03.7); filter by `subscriberId`. |
@@ -39,6 +40,7 @@ Checked against the official documentation on 2026-10-03.
 | Customer | `POST /customers` — `name`, `cpfCnpj` (required), `email`, `externalReference` = subscriber id |
 | Charge | `POST /payments` — `customer`, `billingType: UNDEFINED`, `value`, `dueDate`, `externalReference` = payment id; answers `id`, `invoiceUrl` |
 | Find a charge | `GET /payments?externalReference=<payment id>` |
+| Read a charge's status | `GET /payments/{id}` — `PENDING`/`AWAITING_RISK_ANALYSIS` pending; `RECEIVED`/`CONFIRMED`/`RECEIVED_IN_CASH` paid; `OVERDUE`; `REFUNDED`; anything else changes nothing |
 | Manual receipt | `POST /payments/{id}/receiveInCash` — `paymentDate`, `value` |
 | Refund | `POST /payments/{id}/refund` |
 | Sandbox: pay a charge | `POST /sandbox/payment/{id}/confirm` (smoke test only, never called by the application) |
@@ -267,6 +269,7 @@ own.
 | `POST /api/payments/{id}/send` | 200 | `MANAGE_PAYMENTS` |
 | `POST /api/payments/{id}/confirm` | 200 | `MANAGE_PAYMENTS` |
 | `POST /api/payments/{id}/refund` | 200 | `MANAGE_PAYMENTS` |
+| `POST /api/payments/{id}/sync` | 200 | `MANAGE_PAYMENTS` |
 | `GET /api/payments/{id}` | 200 | `VIEW_PAYMENTS` |
 | `GET /api/payments` | 200, default sort `dueAt:desc` | `VIEW_PAYMENTS` |
 | `POST /api/payments/reindex` | 200 | `MANAGE_SYSTEM` |

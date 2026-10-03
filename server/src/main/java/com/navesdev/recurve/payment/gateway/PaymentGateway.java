@@ -25,6 +25,9 @@ public interface PaymentGateway {
     /** The charge created for this payment, if one reached the gateway — so a resend never charges twice. */
     Optional<Charge> findCharge(UUID paymentId);
 
+    /** Where the charge stands at the gateway now: what a sync asks instead of waiting for the webhook. */
+    ChargeState chargeState(String externalId);
+
     /** FR-04.5: the customer paid outside the gateway; it must stop charging. */
     void receiveInCash(String externalId, BigDecimal amount, LocalDate paidOn);
 

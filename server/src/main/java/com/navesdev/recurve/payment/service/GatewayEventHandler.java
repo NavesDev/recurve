@@ -8,13 +8,15 @@ import org.springframework.stereotype.Component;
 
 import com.navesdev.recurve.payment.domain.Payment;
 import com.navesdev.recurve.payment.domain.PaymentStatus;
+import com.navesdev.recurve.payment.gateway.ChargeState;
 import com.navesdev.recurve.subscriber.service.SubscriberService;
 
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 
 /**
- * What a gateway event does to a payment and its subscriber (FR-04.7).
+ * What the gateway's word does to a payment and its subscriber (FR-04.7),
+ * whether it came as a webhook event or as the answer to a sync.
  * Idempotent — a gateway retries, and reports some payments twice — and
  * silent about charges Recurve does not hold. A late notice never undoes
  * a payment: an overdue notice for a paid charge changes nothing.
@@ -37,13 +39,31 @@ class GatewayEventHandler {
                     event.type(), event.externalReference(), event.externalId());
             return;
         }
-        Payment payment = found.get();
-        switch (event.type()) {
-            case "PAYMENT_CONFIRMED", "PAYMENT_RECEIVED" -> paid(payment);
-            case "PAYMENT_OVERDUE", "PAYMENT_CREDIT_CARD_CAPTURE_REFUSED" -> failed(payment);
-            case "PAYMENT_REFUNDED" -> refunded(payment);
-            default -> log.debug("Gateway event {} ignored for payment {}", event.type(), payment.getId());
+        apply(found.get(), stateOf(event.type()));
+    }
+
+    /**
+     * Brings the payment to where the charge stands at the gateway — the
+     * one rule for the webhook and for a sync. A state already reached, or
+     * one Recurve has no rule for, changes nothing.
+     */
+    void apply(Payment payment, ChargeState state) {
+        switch (state) {
+            case PAID -> paid(payment);
+            case OVERDUE -> failed(payment);
+            case REFUNDED -> refunded(payment);
+            case PENDING, OTHER -> log.debug("Charge state {} changes nothing for payment {}", state, payment.getId());
         }
+    }
+
+    /** Asaas's webhook events onto the state each one reports. */
+    private static ChargeState stateOf(String event) {
+        return switch (event == null ? "" : event) {
+            case "PAYMENT_CONFIRMED", "PAYMENT_RECEIVED" -> ChargeState.PAID;
+            case "PAYMENT_OVERDUE", "PAYMENT_CREDIT_CARD_CAPTURE_REFUSED" -> ChargeState.OVERDUE;
+            case "PAYMENT_REFUNDED" -> ChargeState.REFUNDED;
+            default -> ChargeState.OTHER;
+        };
     }
 
     /** FR-04.2; a failed charge may be paid late. */

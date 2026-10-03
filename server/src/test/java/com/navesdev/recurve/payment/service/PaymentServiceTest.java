@@ -40,6 +40,7 @@ import com.navesdev.recurve.payment.domain.exception.PaymentGatewayException;
 import com.navesdev.recurve.payment.domain.exception.PaymentNotFoundException;
 import com.navesdev.recurve.payment.domain.exception.PaymentNotRefundableException;
 import com.navesdev.recurve.payment.domain.exception.SubscriberNotBillableException;
+import com.navesdev.recurve.payment.gateway.ChargeState;
 import com.navesdev.recurve.payment.gateway.PaymentGateway;
 import com.navesdev.recurve.payment.gateway.PaymentGateway.Charge;
 import com.navesdev.recurve.payment.repository.PaymentRepository;
@@ -390,6 +391,69 @@ class PaymentServiceTest {
 
         private GatewayEvent event(String type, Payment payment) {
             return new GatewayEvent(type, payment.getId().toString(), payment.getExternalId());
+        }
+    }
+
+    @Nested
+    @DisplayName("FR-04.7 asking the gateway instead of waiting to be told")
+    class Syncing {
+
+        @Test
+        void aChargePaidAtTheGatewayIsPaidHereAndTheSubscriberMoves() {
+            Payment payment = sent();
+            when(gateway.chargeState("pay_1")).thenReturn(ChargeState.PAID);
+            savesWhatItIsGiven();
+
+            PaymentSummary synced = service.sync(payment.getId());
+
+            assertThat(synced.status()).isEqualTo(PaymentStatus.PAID);
+            verify(subscriberService).confirmPayment(subscriber.getId());
+        }
+
+        @Test
+        void anOverdueChargeFailsAndTheSubscriberIsPastDue() {
+            Payment payment = sent();
+            when(gateway.chargeState("pay_1")).thenReturn(ChargeState.OVERDUE);
+            savesWhatItIsGiven();
+
+            assertThat(service.sync(payment.getId()).status()).isEqualTo(PaymentStatus.FAILED);
+            verify(subscriberService).markPastDue(subscriber.getId());
+        }
+
+        @Test
+        void aChargeStillAwaitingPaymentChangesNothing() {
+            Payment payment = sent();
+            when(gateway.chargeState("pay_1")).thenReturn(ChargeState.PENDING);
+
+            assertThat(service.sync(payment.getId()).status()).isEqualTo(PaymentStatus.PENDING);
+            verify(repository, never()).save(any());
+        }
+
+        @Test
+        void syncingWhatIsAlreadyKnownChangesNothing() {
+            // The same rule as the webhook: a state already reached is a no-op.
+            Payment payment = sent();
+            payment.confirm(EARLIER);
+            when(gateway.chargeState("pay_1")).thenReturn(ChargeState.PAID);
+
+            service.sync(payment.getId());
+
+            verify(repository, never()).save(any());
+            verifyNoInteractions(subscriberService);
+        }
+
+        @Test
+        void anUnsentChargeHasNothingToAskAbout() {
+            Payment payment = stored(pending());
+
+            assertThat(service.sync(payment.getId()).status()).isEqualTo(PaymentStatus.PENDING);
+            verifyNoInteractions(gateway);
+        }
+
+        private Payment sent() {
+            Payment payment = pending();
+            payment.registerAtGateway("pay_1", null);
+            return stored(payment);
         }
     }
 

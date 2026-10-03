@@ -16,6 +16,7 @@ import com.navesdev.recurve.payment.domain.Payment;
 import com.navesdev.recurve.payment.domain.PaymentSummary;
 import com.navesdev.recurve.payment.domain.exception.PaymentAlreadyRequestedException;
 import com.navesdev.recurve.payment.domain.exception.SubscriberNotBillableException;
+import com.navesdev.recurve.payment.gateway.ChargeState;
 import com.navesdev.recurve.payment.gateway.PaymentGateway;
 import com.navesdev.recurve.payment.gateway.PaymentGateway.Charge;
 import com.navesdev.recurve.plan.domain.PlanPrice;
@@ -119,6 +120,25 @@ public class PaymentService {
             Payment current = store.findOrThrow(paymentId);
             current.refund(clock.instant());
             return store.persist(current);
+        });
+    }
+
+    /**
+     * FR-04.7: asks the gateway where the charge stands and brings the
+     * payment there — what the webhook would have said, for when it did not
+     * arrive or cannot reach this server. Same rule as the webhook. An
+     * unsent charge has nothing to ask about and is returned as it is.
+     */
+    public PaymentSummary sync(UUID paymentId) {
+        Payment payment = store.findOrThrow(paymentId);
+        if (!payment.isSent()) {
+            return PaymentSummary.of(payment);
+        }
+        ChargeState state = gateway.chargeState(payment.getExternalId());
+        return transaction.execute(status -> {
+            Payment current = store.findOrThrow(paymentId);
+            events.apply(current, state);
+            return PaymentSummary.of(current);
         });
     }
 

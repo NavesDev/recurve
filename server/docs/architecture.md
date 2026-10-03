@@ -411,6 +411,12 @@ the controller authenticates Asaas by the `asaas-access-token` header,
 compared in constant time. It answers 200 to events Recurve does not act
 on, so Asaas never pauses its queue over them.
 
+**Sync** (`POST /api/payments/{id}/sync`) is the webhook's other half: it
+asks the gateway where a charge stands (`chargeState`) instead of waiting
+to be told, and hands the answer to the same rule (`GatewayEventHandler`).
+It needs no public URL, and a future reconciliation job only has to call
+it for each pending charge.
+
 ## Failure
 
 Fail-fast: the system prefers to stop and make noise over continuing

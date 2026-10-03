@@ -18,6 +18,8 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.CsvSource;
 import org.springframework.http.HttpMethod;
 import org.springframework.http.MediaType;
 import org.springframework.test.web.client.MockRestServiceServer;
@@ -157,6 +159,33 @@ class AsaasPaymentGatewayTest {
 
             gateway.refund("pay_080225913252");
             server.verify();
+        }
+    }
+
+    @Nested
+    @DisplayName("Asking Asaas where a charge stands, instead of waiting to be told")
+    class States {
+
+        @ParameterizedTest
+        @CsvSource({
+                "PENDING, PENDING",
+                "AWAITING_RISK_ANALYSIS, PENDING",
+                "RECEIVED, PAID",
+                "CONFIRMED, PAID",
+                "RECEIVED_IN_CASH, PAID",
+                "OVERDUE, OVERDUE",
+                "REFUNDED, REFUNDED",
+                "REFUND_IN_PROGRESS, OTHER",
+                "CHARGEBACK_REQUESTED, OTHER" })
+        void asaasStatusesBecomeTheStatesRecurveActsOn(String asaas, ChargeState state) {
+            server.expect(requestTo(API + "/payments/pay_080225913252"))
+                    .andExpect(method(HttpMethod.GET))
+                    .andExpect(header("access_token", KEY))
+                    .andRespond(withSuccess("""
+                            {"object":"payment","id":"pay_080225913252","status":"%s"}
+                            """.formatted(asaas), MediaType.APPLICATION_JSON));
+
+            assertThat(gateway.chargeState("pay_080225913252")).isEqualTo(state);
         }
     }
 

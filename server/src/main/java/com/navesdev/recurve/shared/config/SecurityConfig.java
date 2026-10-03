@@ -32,11 +32,15 @@ import org.springframework.web.servlet.HandlerExceptionResolver;
 @Configuration
 public class SecurityConfig {
 
+    /** The value of {@code recurve.payment.gateway} under which the Asaas webhook exists. */
+    private static final String ASAAS_GATEWAY = "asaas";
+
     @Bean
     public SecurityFilterChain securityFilterChain(
             HttpSecurity http,
             @Qualifier("handlerExceptionResolver") HandlerExceptionResolver exceptionResolver,
-            @Value("${recurve.docs.enabled:false}") boolean docsEnabled) throws Exception {
+            @Value("${recurve.docs.enabled:false}") boolean docsEnabled,
+            @Value("${recurve.payment.gateway:fake}") String paymentGateway) throws Exception {
         return http
                 // No cookie-based session to protect, and no browser form posts.
                 .csrf(csrf -> csrf.disable())
@@ -48,10 +52,17 @@ public class SecurityConfig {
                     if (docsEnabled) {
                         requests.requestMatchers(DocsConfig.PATH, DocsConfig.PATH + "/**").permitAll();
                     }
+                    // FR-04.7: the payment gateway is no operator. Its webhook
+                    // authenticates it by its own token, in the controller, and
+                    // exists only while Asaas is the gateway: otherwise the path
+                    // answers 401 like any other.
+                    if (ASAAS_GATEWAY.equals(paymentGateway)) {
+                        requests.requestMatchers(HttpMethod.POST, "/api/webhooks/asaas").permitAll();
+                    }
                     requests
                         // FR-01.5: rebuilding an index is a system operation.
-                        .requestMatchers(HttpMethod.POST,
-                                "/api/users/reindex", "/api/plans/reindex", "/api/subscribers/reindex")
+                        .requestMatchers(HttpMethod.POST, "/api/users/reindex", "/api/plans/reindex",
+                                "/api/subscribers/reindex", "/api/payments/reindex")
                             .hasAuthority("MANAGE_SYSTEM")
                         // BR-01: operators have no view permission; reading them is managing them.
                         .requestMatchers("/api/users/**").hasAuthority("MANAGE_USERS")
@@ -62,6 +73,9 @@ public class SecurityConfig {
                         // BR-01: subscribers are read with VIEW_SUBSCRIBERS, which MANAGE_SUBSCRIBERS implies.
                         .requestMatchers(HttpMethod.GET, "/api/subscribers/**").hasAuthority("VIEW_SUBSCRIBERS")
                         .requestMatchers("/api/subscribers/**").hasAuthority("MANAGE_SUBSCRIBERS")
+                        // BR-01: payments are read with VIEW_PAYMENTS, which MANAGE_PAYMENTS implies.
+                        .requestMatchers(HttpMethod.GET, "/api/payments/**").hasAuthority("VIEW_PAYMENTS")
+                        .requestMatchers("/api/payments/**").hasAuthority("MANAGE_PAYMENTS")
                         .anyRequest().authenticated();
                 })
                 // A refusal happens in the filter, before any controller; hand it

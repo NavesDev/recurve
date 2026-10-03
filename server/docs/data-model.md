@@ -81,19 +81,26 @@ deferred exclusion constraint (see Indexes).
 
 ## Subscriber
 
-Subscriber of a plan price.
+Subscriber of a plan price. Holds the price by id; it never changes price
+here (FR-03.5 is **[open]**), so a new amount on the plan leaves it where
+it was (BR-04).
 
 | Field | Type | Column | Notes |
 |---|---|---|---|
 | id | UUID | `id` | PK |
 | planPriceId | UUID | `plan_price_id` | FK `plan_prices.id`, not null |
-| name | String | `name` | not null |
-| email | String | `email` | not null, unique |
+| name | String | `name` | not null, at most 120 |
+| email | String | `email` | not null, at most 255, unique across every status (a canceled subscriber keeps it); trimmed and lower-cased |
 | status | SubscriberStatus | `status` | not null, enum as string |
 | startedAt | Instant | `started_at` | not null |
 | nextBillingAt | Instant | `next_billing_at` | not null. State, not a derivation: it changes only by an event (payment confirmed, price change, reactivation), always through a domain method |
-| canceledAt | Instant | `canceled_at` | nullable |
+| canceledAt | Instant | `canceled_at` | nullable; filled exactly when `CANCELED` (a `CHECK` in the schema) |
 | createdAt | Instant | `created_at` | not null |
+
+No payment data yet. The gateway is **[open]** (FR-04.7); when it is
+chosen, a migration adds the gateway's customer id, and a tax document if
+the gateway needs one. Card data is never stored here: it stays with the
+gateway.
 
 
 ### SubscriberStatus (enum, `subscriber`)
@@ -159,11 +166,10 @@ is already filtered (sorting one page in memory is irrelevant).
 | `plans` | `active` | btree | FR-02.4, list active ones only |
 | `plan_prices` | `plan_id` | btree | FK; list a plan's prices |
 | `plan_prices` | `ex_plan_prices_one_active` `(plan_id, billing_interval, currency) WHERE active` | exclusion constraint, deferred | BR-03, checked at commit so a replace can insert the successor before deactivating the old price |
-| `subscribers` | `email` | unique | BR-02 |
+| `subscribers` | `uq_subscribers_email` `(email)` | unique constraint | BR-02 |
 | `subscribers` | `plan_price_id` | btree | FK; filter by plan (FR-06.3); subscription count (FR-06.2) |
 | `subscribers` | `status` | btree | filter by status (FR-06.3) |
 | `subscribers` | `next_billing_at` | btree | billing job `WHERE next_billing_at <= now()` (FR-04.1) |
-| `subscribers` | `started_at` | btree | default sort (FR-06.3) |
 | `payments` | `subscriber_id` | btree | FK; list by subscriber (FR-04.6) |
 | `payments` | `status` | btree | list by status (FR-04.6) |
 | `payments` | `external_id` | btree | webhook and reconciliation (FR-04.7) |
@@ -176,6 +182,8 @@ Deliberately not indexed:
 - Sorting by a subscriber's billed amount (FR-06.3): join on
   `plan_prices` by its PK, then sort the filtered result.
 - `users.active`: small table, low cardinality.
+- `subscribers.started_at`: the default sort of FR-06.3 is served by the
+  search index, never by PostgreSQL.
 
 Declaration: Flyway now exists (NFR-08), so the migrations under
 `server/src/main/resources/db/migration` are the source of truth for the
@@ -185,5 +193,5 @@ migrations produced; it never changes it.
 
 Migrations are versioned `V<n>__<description>.sql` and are immutable once
 merged: a correction is a new migration, never an edit of an applied one.
-`V1` creates the operator tables and `V2` the plan tables; the tables for
-`subscriber` and `payment` come with their features.
+`V1` creates the operator tables, `V2` the plan tables and `V3` the
+subscriber table; the table for `payment` comes with its feature.

@@ -279,6 +279,47 @@ class PlanTest {
     }
 
     @Nested
+    @DisplayName("FR-02.3, FR-02.4 which price takes a new subscriber")
+    class Subscribing {
+
+        @Test
+        void anActivePriceOfAnActivePlanTakesANewSubscriber() {
+            Plan plan = Plan.create("Pro", null, NOW);
+            PlanPrice price = plan.addPrice(MONTHLY_AMOUNT, "BRL", BillingInterval.MONTHLY, NOW);
+
+            assertThat(plan.subscribablePrice(price.getId())).isSameAs(price);
+        }
+
+        @Test
+        void anInactivePlanTakesNoNewSubscriber() {
+            Plan plan = Plan.create("Pro", null, NOW);
+            PlanPrice price = plan.addPrice(MONTHLY_AMOUNT, "BRL", BillingInterval.MONTHLY, NOW);
+            plan.deactivate();
+
+            assertThatThrownBy(() -> plan.subscribablePrice(price.getId()))
+                    .isInstanceOf(PlanInactiveException.class);
+        }
+
+        @Test
+        void anInactivePriceTakesNoNewSubscriber() {
+            Plan plan = Plan.create("Pro", null, NOW);
+            PlanPrice price = plan.addPrice(MONTHLY_AMOUNT, "BRL", BillingInterval.MONTHLY, NOW);
+            plan.deactivatePrice(price.getId());
+
+            assertThatThrownBy(() -> plan.subscribablePrice(price.getId()))
+                    .isInstanceOf(PriceInactiveException.class);
+        }
+
+        @Test
+        void aPriceThePlanDoesNotHaveIsNotFound() {
+            Plan plan = Plan.create("Pro", null, NOW);
+
+            assertThatThrownBy(() -> plan.subscribablePrice(UUID.randomUUID()))
+                    .isInstanceOf(PriceNotFoundException.class);
+        }
+    }
+
+    @Nested
     @DisplayName("The prices change only through the plan")
     class Encapsulation {
 

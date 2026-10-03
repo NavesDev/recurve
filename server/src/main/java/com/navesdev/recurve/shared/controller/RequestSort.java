@@ -28,10 +28,13 @@ public record RequestSort(String field, Sort.Direction direction) {
     private static final String KEY_SEPARATOR = ",";
     private static final char DIRECTION_SEPARATOR = ':';
 
-    /** The keys as named, in order; the feature's default, ascending, when absent. */
-    public static List<RequestSort> parse(String value, String defaultField) {
+    /**
+     * The keys as named, in order; the feature's default when absent,
+     * spelled the same way ({@code startedAt:desc}).
+     */
+    public static List<RequestSort> parse(String value, String defaultSort) {
         if (value == null || value.isBlank()) {
-            return List.of(new RequestSort(defaultField, Sort.Direction.ASC));
+            return List.of(parseKey(defaultSort));
         }
 
         List<RequestSort> keys = new ArrayList<>();

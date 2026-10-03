@@ -1,0 +1,31 @@
+{
+  "properties": {
+    "id": { "type": "keyword", "index": false },
+    "name": {
+      "type": "text",
+      "analyzer": "prefix",
+      "search_analyzer": "prefix_search",
+      "fields": {
+        "keyword": { "type": "keyword", "normalizer": "lowercase" }
+      }
+    },
+    "email": {
+      "type": "text",
+      "analyzer": "prefix",
+      "search_analyzer": "prefix_search",
+      "fields": {
+        "keyword": { "type": "keyword", "normalizer": "lowercase" }
+      }
+    },
+    "status": { "type": "keyword", "index": false },
+    "planId": { "type": "keyword", "index": false },
+    "planPriceId": { "type": "keyword", "index": false },
+    "price": { "type": "scaled_float", "scaling_factor": 100, "index": false },
+    "currency": { "type": "keyword", "index": false },
+    "interval": { "type": "keyword", "index": false },
+    "startedAt": { "type": "date", "format": "date_time", "index": false },
+    "nextBillingAt": { "type": "date", "format": "date_time", "index": false },
+    "canceledAt": { "type": "date", "format": "date_time", "index": false, "doc_values": false },
+    "createdAt": { "type": "date", "format": "date_time", "index": false }
+  }
+}

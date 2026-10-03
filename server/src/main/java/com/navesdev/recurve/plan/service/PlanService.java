@@ -2,7 +2,10 @@ package com.navesdev.recurve.plan.service;
 
 import java.time.Clock;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
+import java.util.Set;
 import java.util.UUID;
 import java.util.stream.Stream;
 
@@ -12,6 +15,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import com.navesdev.recurve.plan.domain.Plan;
+import com.navesdev.recurve.plan.domain.PlanPrice;
 import com.navesdev.recurve.plan.domain.PlanSummary;
 import com.navesdev.recurve.plan.domain.exception.PlanNotFoundException;
 import com.navesdev.recurve.plan.domain.exception.PriceNotFoundException;
@@ -80,6 +84,44 @@ public class PlanService {
         Plan plan = findByPriceOrThrow(priceId);
         plan.deactivatePrice(priceId);
         return persist(plan);
+    }
+
+    /**
+     * FR-03.1: the plan holding a price a new subscriber may take. The
+     * whole plan rather than the price, because a price holds no
+     * reference back to its plan and the subscriber listing shows both.
+     */
+    @Transactional(readOnly = true)
+    public Plan findForSubscription(UUID priceId) {
+        Plan plan = findByPriceOrThrow(priceId);
+        plan.subscribablePrice(priceId);
+        return plan;
+    }
+
+    /**
+     * The plan holding each of these prices, whatever state either is in:
+     * a subscriber stays on its price (FR-02.3). One query for a whole
+     * page or batch of subscribers. A price nobody holds is a broken
+     * database, not an empty answer.
+     */
+    @Transactional(readOnly = true)
+    public Map<UUID, Plan> findByPriceIds(Set<UUID> priceIds) {
+        if (priceIds.isEmpty()) {
+            return Map.of();
+        }
+        Map<UUID, Plan> byPrice = new HashMap<>();
+        for (Plan plan : repository.findByPriceIds(priceIds)) {
+            for (PlanPrice price : plan.getPrices()) {
+                byPrice.put(price.getId(), plan);
+            }
+        }
+        byPrice.keySet().retainAll(priceIds);
+        for (UUID priceId : priceIds) {
+            if (!byPrice.containsKey(priceId)) {
+                throw new PriceNotFoundException(priceId);
+            }
+        }
+        return byPrice;
     }
 
     /** FR-06.2 and FR-07: search and filter, then sort, then paginate — all in the index. */

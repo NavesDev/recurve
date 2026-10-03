@@ -4,10 +4,10 @@ import java.util.UUID;
 
 import com.navesdev.recurve.shared.domain.exception.BusinessRuleException;
 
-/** FR-02.4: an inactive plan accepts no new price and no replacement. */
+/** FR-02.4: an inactive plan accepts no new price, no replacement and no new subscriber. */
 public class PlanInactiveException extends BusinessRuleException {
 
     public PlanInactiveException(UUID id) {
-        super("Plan %s is inactive and accepts no new price".formatted(id));
+        super("Plan %s is inactive".formatted(id));
     }
 }

@@ -6,6 +6,8 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import java.math.BigDecimal;
 import java.time.Instant;
+import java.util.List;
+import java.util.Set;
 import java.util.UUID;
 import java.util.stream.Stream;
 
@@ -99,6 +101,23 @@ class PlanRepositoryIT {
         @Test
         void aPriceNobodyHoldsFindsNoPlan() {
             assertThat(repository.findByPriceId(UUID.randomUUID())).isEmpty();
+        }
+
+        @Test
+        void thePlansHoldingSeveralPricesAreFoundOnceEach() {
+            Plan pro = Plan.create("Pro", null, NOW);
+            PlanPrice proMonthly = pro.addPrice(new BigDecimal("49.90"), "BRL", BillingInterval.MONTHLY, NOW);
+            PlanPrice proYearly = pro.addPrice(new BigDecimal("499.00"), "BRL", BillingInterval.YEARLY, NOW);
+            Plan basic = Plan.create("Basic", null, NOW);
+            PlanPrice basicMonthly = basic.addPrice(new BigDecimal("19.90"), "BRL", BillingInterval.MONTHLY, NOW);
+            store(pro);
+            store(basic);
+            store(Plan.create("Free", null, NOW));
+
+            List<Plan> found = repository.findByPriceIds(
+                    Set.of(proMonthly.getId(), proYearly.getId(), basicMonthly.getId(), UUID.randomUUID()));
+
+            assertThat(found).extracting(Plan::getName).containsExactlyInAnyOrder("Pro", "Basic");
         }
     }
 

@@ -50,7 +50,8 @@ public class SecurityConfig {
                     }
                     requests
                         // FR-01.5: rebuilding an index is a system operation.
-                        .requestMatchers(HttpMethod.POST, "/api/users/reindex", "/api/plans/reindex")
+                        .requestMatchers(HttpMethod.POST,
+                                "/api/users/reindex", "/api/plans/reindex", "/api/subscribers/reindex")
                             .hasAuthority("MANAGE_SYSTEM")
                         // BR-01: operators have no view permission; reading them is managing them.
                         .requestMatchers("/api/users/**").hasAuthority("MANAGE_USERS")
@@ -58,6 +59,9 @@ public class SecurityConfig {
                         .requestMatchers(HttpMethod.GET, "/api/plans/**").hasAuthority("VIEW_PLANS")
                         // A price is part of its plan: changing either is managing plans.
                         .requestMatchers("/api/plans/**", "/api/prices/**").hasAuthority("MANAGE_PLANS")
+                        // BR-01: subscribers are read with VIEW_SUBSCRIBERS, which MANAGE_SUBSCRIBERS implies.
+                        .requestMatchers(HttpMethod.GET, "/api/subscribers/**").hasAuthority("VIEW_SUBSCRIBERS")
+                        .requestMatchers("/api/subscribers/**").hasAuthority("MANAGE_SUBSCRIBERS")
                         .anyRequest().authenticated();
                 })
                 // A refusal happens in the filter, before any controller; hand it

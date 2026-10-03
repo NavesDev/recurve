@@ -289,8 +289,10 @@ Spring Security, HTTP Basic, and **one rule per route family** in
 `SecurityConfig`:
 
 ```java
-.requestMatchers(HttpMethod.POST, "/api/users/reindex").hasAuthority("MANAGE_SYSTEM")
+.requestMatchers(HttpMethod.POST, "/api/users/reindex", "/api/plans/reindex").hasAuthority("MANAGE_SYSTEM")
 .requestMatchers("/api/users/**").hasAuthority("MANAGE_USERS")
+.requestMatchers(HttpMethod.GET, "/api/plans/**").hasAuthority("VIEW_PLANS")
+.requestMatchers("/api/plans/**", "/api/prices/**").hasAuthority("MANAGE_PLANS")
 .anyRequest().authenticated()
 ```
 
@@ -400,6 +402,7 @@ Abstract bases in `shared/domain/exception/`; concrete ones in
 | `NotFoundException` | resource does not exist | 404 | `PlanNotFoundException` |
 | `BusinessRuleException` | business rule violated | 422 | `EmailAlreadyInUseException`, `PaymentNotRefundableException` |
 | `ExternalServiceException` | external service failed | 502 | `PaymentGatewayException` |
+| `OptimisticLockingFailureException` | another request changed the record first | 409 | two replaces of one price at once |
 | `MethodArgumentNotValidException` | Bean Validation | 400 | — |
 | `InvalidRequestException` | request shape Bean Validation cannot express | 400 | sort field outside the allowed list |
 | `AuthenticationException` | no, wrong or refused credentials; no `WWW-Authenticate` challenge, so a browser never pops its own dialog over a client | 401 | — |
@@ -646,14 +649,14 @@ not one.
 The unit of scope is the **aggregate**, not the table. A collection table
 belongs to the aggregate that owns it and has no meaning without it, so
 `users` and `user_permissions` are created by one migration, and
-`plans` and `plan_prices` will be created by another. Splitting an
+`plans` and `plan_prices` are created by another. Splitting an
 aggregate across migrations would leave a version of the schema in which
 the aggregate cannot be persisted at all.
 
 | Scope | Migration |
 |---|---|
 | operators and their permissions | `V1__create_users.sql` |
-| plans and their prices | a separate one |
+| plans and their prices | `V2__create_plans.sql` |
 | subscribers | a separate one |
 | payments | a separate one |
 | an index added to an existing table | a separate one |
@@ -676,6 +679,11 @@ The operator index's settings (analyzers) and mapping live in
 fills it from the database. There is no versioning as with Flyway: a
 mapping change is a rebuild (`POST /api/users/reindex`), which recreates
 the index from the files and reindexes every operator.
+
+The plan index follows the same pattern: `search/plans-settings.json`,
+`plans-mapping.json`, `PlanIndexBootstrap`, `POST /api/plans/reindex`.
+Its `activeIntervals` field is derived in `PlanSummary` so that "a plan
+with an active price in this cycle" is a plain `terms` filter.
 
 `spring.elasticsearch.uris` follows the same placeholder pattern as the
 datasource (`${ES_URL:http://localhost:9230}`). Integration tests share
@@ -702,4 +710,5 @@ generated setter would open a second door into the domain.
 | Request/Response | `<Verb><Thing>Request`, `<Thing>Response` | `CreatePlanRequest` |
 | Controller | `<Thing>Controller` | `PlanController` |
 | Route | `/api/<things>` plural | `/api/plans` |
+| Sub-resource route | created under its parent, then addressed alone by its own id | `POST /api/plans/{id}/prices`, `DELETE /api/prices/{id}` |
 | Table | snake_case plural | `plan_prices` |

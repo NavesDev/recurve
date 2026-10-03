@@ -30,11 +30,20 @@ names here are business terms, not code identifiers.
 
 - FR-02.1 Register a plan with name and optional description.
 - FR-02.2 Register one or more prices for a plan, each with amount,
-  currency and billing cycle (monthly, yearly).
+  currency and billing cycle (monthly, yearly). The amount is greater
+  than zero. A price whose cycle and currency already have an active
+  price on the plan is refused (BR-03); changing it is FR-02.7.
 - FR-02.3 Deactivate a price. Inactive price accepts no new subscribers;
   existing subscribers stay on it.
-- FR-02.4 Deactivate a plan. Inactive plan accepts no new subscribers.
-- FR-02.5 List plans with their prices (see FR-06.2).
+- FR-02.4 Deactivate a plan. Inactive plan accepts no new subscribers and
+  no new or replacement price. Its prices keep their own state.
+- FR-02.5 List plans with their prices, inactive ones included (see
+  FR-06.2). Rebuild the plan search index on request; requires
+  `MANAGE_SYSTEM`.
+- FR-02.6 Edit a plan's name and description.
+- FR-02.7 Replace a price with a new amount: a new price with the same
+  cycle and currency is created and the old one deactivated, in one
+  operation (BR-04). Only an active price can be replaced.
 
 ### FR-03 Subscribers
 

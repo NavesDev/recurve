@@ -15,6 +15,8 @@ servers:
 
 tags:
   - name: Users
+  - name: Plans
+  - name: Prices
 
 security:
   - basicAuth: []
@@ -209,6 +211,352 @@ paths:
         '503':
           $ref: '#/components/responses/ServiceUnavailable'
 
+  /api/plans:
+
+    post:
+      tags: [Plans]
+      operationId: createPlan
+      summary: Register a plan
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreatePlanRequest'
+      responses:
+        '201':
+          description: Created
+          headers:
+            Location:
+              schema:
+                type: string
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PlanResponse'
+              example:
+                id: 3f2a1b0c-9d8e-4f7a-8b6c-5d4e3f2a1b0c
+                name: Pro
+                description: For teams
+                active: true
+                createdAt: '2026-01-15T10:00:00Z'
+                prices: []
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '422':
+          $ref: '#/components/responses/UnprocessableEntity'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
+
+    get:
+      tags: [Plans]
+      operationId: searchPlans
+      summary: List plans
+      parameters:
+        - $ref: '#/components/parameters/q'
+        - $ref: '#/components/parameters/filter'
+        - $ref: '#/components/parameters/page'
+        - $ref: '#/components/parameters/size'
+        - $ref: '#/components/parameters/sort'
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PlanPage'
+              example:
+                items:
+                  - id: 3f2a1b0c-9d8e-4f7a-8b6c-5d4e3f2a1b0c
+                    name: Pro
+                    description: For teams
+                    active: true
+                    createdAt: '2026-01-15T10:00:00Z'
+                    prices:
+                      - id: 7c6b5a49-3827-4615-9e0d-1c2b3a4f5e6d
+                        price: 49.90
+                        currency: BRL
+                        interval: MONTHLY
+                        active: true
+                        createdAt: '2026-01-15T10:00:00Z'
+                page: 0
+                size: 20
+                total: 1
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '502':
+          $ref: '#/components/responses/BadGateway'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
+
+  /api/plans/{id}:
+
+    parameters:
+      - $ref: '#/components/parameters/planId'
+
+    get:
+      tags: [Plans]
+      operationId: findPlan
+      summary: Get a plan
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PlanResponse'
+              examples:
+                plan:
+                  $ref: '#/components/examples/plan'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
+
+    put:
+      tags: [Plans]
+      operationId: updatePlan
+      summary: Update a plan
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdatePlanRequest'
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PlanResponse'
+              examples:
+                plan:
+                  $ref: '#/components/examples/plan'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
+        '422':
+          $ref: '#/components/responses/UnprocessableEntity'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
+
+    delete:
+      tags: [Plans]
+      operationId: deactivatePlan
+      summary: Deactivate a plan
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PlanResponse'
+              example:
+                id: 3f2a1b0c-9d8e-4f7a-8b6c-5d4e3f2a1b0c
+                name: Pro
+                description: For teams
+                active: false
+                createdAt: '2026-01-15T10:00:00Z'
+                prices:
+                  - id: 7c6b5a49-3827-4615-9e0d-1c2b3a4f5e6d
+                    price: 49.90
+                    currency: BRL
+                    interval: MONTHLY
+                    active: true
+                    createdAt: '2026-01-15T10:00:00Z'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
+        '422':
+          $ref: '#/components/responses/UnprocessableEntity'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
+
+  /api/plans/{id}/prices:
+
+    parameters:
+      - $ref: '#/components/parameters/planId'
+
+    post:
+      tags: [Plans]
+      operationId: addPrice
+      summary: Add a price to a plan
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AddPriceRequest'
+      responses:
+        '201':
+          description: Created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PlanResponse'
+              examples:
+                plan:
+                  $ref: '#/components/examples/plan'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
+        '422':
+          $ref: '#/components/responses/UnprocessableEntity'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
+
+  /api/plans/reindex:
+
+    post:
+      tags: [Plans]
+      operationId: reindexPlans
+      summary: Rebuild the plan search index
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ReindexResponse'
+              example:
+                indexed: 12
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
+
+  /api/prices/{id}/replace:
+
+    parameters:
+      - $ref: '#/components/parameters/priceId'
+
+    post:
+      tags: [Prices]
+      operationId: replacePrice
+      summary: Replace a price with a new amount
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ReplacePriceRequest'
+      responses:
+        '201':
+          description: Created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PlanResponse'
+              example:
+                id: 3f2a1b0c-9d8e-4f7a-8b6c-5d4e3f2a1b0c
+                name: Pro
+                description: For teams
+                active: true
+                createdAt: '2026-01-15T10:00:00Z'
+                prices:
+                  - id: 7c6b5a49-3827-4615-9e0d-1c2b3a4f5e6d
+                    price: 49.90
+                    currency: BRL
+                    interval: MONTHLY
+                    active: false
+                    createdAt: '2026-01-15T10:00:00Z'
+                  - id: 0e1d2c3b-4a59-4687-b7c6-d5e4f3a2b1c0
+                    price: 59.90
+                    currency: BRL
+                    interval: MONTHLY
+                    active: true
+                    createdAt: '2026-03-01T10:00:00Z'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
+        '422':
+          $ref: '#/components/responses/UnprocessableEntity'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
+
+  /api/prices/{id}:
+
+    parameters:
+      - $ref: '#/components/parameters/priceId'
+
+    delete:
+      tags: [Prices]
+      operationId: deactivatePrice
+      summary: Deactivate a price
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PlanResponse'
+              example:
+                id: 3f2a1b0c-9d8e-4f7a-8b6c-5d4e3f2a1b0c
+                name: Pro
+                description: For teams
+                active: true
+                createdAt: '2026-01-15T10:00:00Z'
+                prices:
+                  - id: 7c6b5a49-3827-4615-9e0d-1c2b3a4f5e6d
+                    price: 49.90
+                    currency: BRL
+                    interval: MONTHLY
+                    active: false
+                    createdAt: '2026-01-15T10:00:00Z'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
+        '422':
+          $ref: '#/components/responses/UnprocessableEntity'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
+
 components:
 
   securitySchemes:
@@ -219,6 +567,22 @@ components:
   parameters:
 
     userId:
+      name: id
+      in: path
+      required: true
+      schema:
+        type: string
+        format: uuid
+
+    planId:
+      name: id
+      in: path
+      required: true
+      schema:
+        type: string
+        format: uuid
+
+    priceId:
       name: id
       in: path
       required: true
@@ -299,6 +663,13 @@ components:
 
     UnprocessableEntity:
       description: Unprocessable Entity
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ApiError'
+
+    Conflict:
+      description: Conflict
       content:
         application/json:
           schema:
@@ -414,6 +785,124 @@ components:
           format: int64
           minimum: 0
 
+    BillingInterval:
+      type: string
+      enum:
+        - MONTHLY
+        - YEARLY
+
+    CreatePlanRequest:
+      type: object
+      required: [name]
+      properties:
+        name:
+          type: string
+          minLength: 1
+          maxLength: 120
+        description:
+          type: string
+          nullable: true
+          maxLength: 500
+
+    UpdatePlanRequest:
+      type: object
+      required: [name]
+      properties:
+        name:
+          type: string
+          minLength: 1
+          maxLength: 120
+        description:
+          type: string
+          nullable: true
+          maxLength: 500
+
+    AddPriceRequest:
+      type: object
+      required: [price, currency, interval]
+      properties:
+        price:
+          type: number
+          minimum: 0.01
+          maximum: 9999999999.99
+        currency:
+          type: string
+          pattern: '^[A-Za-z]{3}$'
+        interval:
+          $ref: '#/components/schemas/BillingInterval'
+
+    ReplacePriceRequest:
+      type: object
+      required: [price]
+      properties:
+        price:
+          type: number
+          minimum: 0.01
+          maximum: 9999999999.99
+
+    PriceResponse:
+      type: object
+      required: [id, price, currency, interval, active, createdAt]
+      properties:
+        id:
+          type: string
+          format: uuid
+        price:
+          type: number
+          minimum: 0.01
+          maximum: 9999999999.99
+        currency:
+          type: string
+          pattern: '^[A-Z]{3}$'
+        interval:
+          $ref: '#/components/schemas/BillingInterval'
+        active:
+          type: boolean
+        createdAt:
+          type: string
+          format: date-time
+
+    PlanResponse:
+      type: object
+      required: [id, name, active, createdAt, prices]
+      properties:
+        id:
+          type: string
+          format: uuid
+        name:
+          type: string
+        description:
+          type: string
+          nullable: true
+        active:
+          type: boolean
+        createdAt:
+          type: string
+          format: date-time
+        prices:
+          type: array
+          items:
+            $ref: '#/components/schemas/PriceResponse'
+
+    PlanPage:
+      type: object
+      required: [items, page, size, total]
+      properties:
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/PlanResponse'
+        page:
+          type: integer
+          minimum: 0
+        size:
+          type: integer
+          minimum: 1
+        total:
+          type: integer
+          format: int64
+          minimum: 0
+
     ReindexResponse:
       type: object
       required: [indexed]
@@ -460,3 +949,18 @@ components:
         permissions: [MANAGE_USERS]
         active: true
         createdAt: '2026-01-15T10:00:00Z'
+
+    plan:
+      value:
+        id: 3f2a1b0c-9d8e-4f7a-8b6c-5d4e3f2a1b0c
+        name: Pro
+        description: For teams
+        active: true
+        createdAt: '2026-01-15T10:00:00Z'
+        prices:
+          - id: 7c6b5a49-3827-4615-9e0d-1c2b3a4f5e6d
+            price: 49.90
+            currency: BRL
+            interval: MONTHLY
+            active: true
+            createdAt: '2026-01-15T10:00:00Z'

@@ -62,11 +62,12 @@ A page that grows too much logic extracts a hook next to it. A file that
 grows becomes a folder with the same `index`. A feature omits what it
 does not need.
 
-### Dependency rules (ESLint enforces them)
+### Dependency rules (ESLint enforces them: `eslint/architecture.js`)
 
 - `shared/` imports no feature.
-- A feature imports `shared/*`, `auth/` and another feature's `index.ts`
-  only — never its `constants.ts`, `api.ts` or a component. A constant two
+- A feature imports `shared/*` and another feature's `index.ts` only —
+  `auth/` included — never its `constants.ts`, `api.ts` or a component.
+  `App.tsx` is held to the same rule. A constant two
   features need therefore moves to `shared/constants/`.
 - `VIEW_*` / `MANAGE_*` string literals only in
   `shared/constants/permissions.ts`.

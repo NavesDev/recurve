@@ -1,5 +1,6 @@
+import { Suspense } from 'react';
 import { Outlet, useMatches, useNavigate } from 'react-router';
-import { can, initialsOf, RequireAuth, signOut, useMe } from './auth';
+import { can, initialsOf, LoadingScreen, RequireAuth, signOut, useMe } from './auth';
 import { overviewNav } from './overview';
 import { paymentNav } from './payment';
 import { planNav } from './plan';
@@ -41,7 +42,9 @@ function SignedInShell() {
         navigate(ROUTES.login, { replace: true });
       }}
     >
-      <Outlet />
+      <Suspense fallback={<LoadingScreen />}>
+        <Outlet />
+      </Suspense>
     </AppShell>
   );
 }

@@ -1,9 +1,12 @@
+import { lazy } from 'react';
 import type { RouteObject } from 'react-router';
 import { RequirePermission } from '../auth';
 import { PERMISSIONS } from '../shared/constants/permissions';
 import { ROUTE_PATTERNS } from '../shared/constants/routes';
 import { systemNav } from './constants';
-import { SystemPage } from './pages/SystemPage';
+
+// Each screen is its own chunk, loaded when first opened.
+const SystemPage = lazy(() => import('./pages/SystemPage').then((module) => ({ default: module.SystemPage })));
 
 export const systemRoutes: RouteObject[] = [
   {

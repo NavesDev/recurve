@@ -1,10 +1,14 @@
+import { lazy } from 'react';
 import type { RouteObject } from 'react-router';
 import { RequirePermission } from '../auth';
 import { PERMISSIONS } from '../shared/constants/permissions';
 import { ROUTE_PATTERNS } from '../shared/constants/routes';
 import { userNav } from './constants';
-import { UserEditPage, UserNewPage } from './pages/UserFormPage';
-import { UserListPage } from './pages/UserListPage';
+
+// Each screen is its own chunk, loaded when first opened.
+const UserEditPage = lazy(() => import('./pages/UserFormPage').then((module) => ({ default: module.UserEditPage })));
+const UserNewPage = lazy(() => import('./pages/UserFormPage').then((module) => ({ default: module.UserNewPage })));
+const UserListPage = lazy(() => import('./pages/UserListPage').then((module) => ({ default: module.UserListPage })));
 
 const handle = { section: userNav.label };
 const guard = (element: React.ReactNode) => <RequirePermission permission={PERMISSIONS.MANAGE_USERS}>{element}</RequirePermission>;

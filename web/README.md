@@ -25,7 +25,7 @@ operator (the bootstrap admin from `server/.env` on a fresh database).
 | `npm run lint` | ESLint (including the architecture rules) + `tsc --noEmit` |
 | `npm test` | Vitest: unit and component tests |
 | `npm run build` | type-check and production build into `dist/` |
-| `npm run e2e` | Playwright against the real server (must be running) |
+| `npm run e2e` | Playwright against the real server (must be running; see below) |
 
 ## Architecture
 
@@ -94,6 +94,11 @@ does not need.
 - The server is still the authority; the client only avoids offering
   what would be refused.
 
+### Loading
+
+Each screen is its own chunk (`lazy()` in the feature's `routes.tsx`),
+loaded the first time it opens; the shell shows a spinner meanwhile.
+
 ### Session and cache
 
 The token lives in memory and `sessionStorage` (survives a reload, dies
@@ -115,3 +120,16 @@ look belongs to `shared/design`. Variants by prop, not by class.
 | Unit | Vitest | next to the file (`x.test.ts`) | `domain.ts`, `shared/format`, `shared/api` |
 | Component | Vitest + Testing Library + MSW | next to the file (`X.test.tsx`) | forms, guards, tables |
 | End-to-end | Playwright | `e2e/` | journeys against the real server |
+
+End-to-end journeys need the server and its stores running, and an
+operator holding every permission:
+
+```bash
+npx playwright install chromium            # once
+E2E_EMAIL=admin@recurve.local E2E_PASSWORD=… npm run e2e
+```
+
+They start their own Vite on port 5174, proxying to `API_TARGET`
+(default `http://localhost:8080`), and create uniquely named data on each
+run. CI runs lint, unit and component tests and the build; the journeys
+stay local until CI starts the whole stack.

@@ -1,11 +1,15 @@
+import { lazy } from 'react';
 import type { RouteObject } from 'react-router';
 import { RequirePermission } from '../auth';
 import { PERMISSIONS } from '../shared/constants/permissions';
 import { ROUTE_PATTERNS } from '../shared/constants/routes';
 import { subscriberNav } from './constants';
-import { SubscriberDetailPage } from './pages/SubscriberDetailPage';
-import { SubscriberEditPage, SubscriberNewPage } from './pages/SubscriberFormPage';
-import { SubscriberListPage } from './pages/SubscriberListPage';
+
+// Each screen is its own chunk, loaded when first opened.
+const SubscriberDetailPage = lazy(() => import('./pages/SubscriberDetailPage').then((module) => ({ default: module.SubscriberDetailPage })));
+const SubscriberEditPage = lazy(() => import('./pages/SubscriberFormPage').then((module) => ({ default: module.SubscriberEditPage })));
+const SubscriberNewPage = lazy(() => import('./pages/SubscriberFormPage').then((module) => ({ default: module.SubscriberNewPage })));
+const SubscriberListPage = lazy(() => import('./pages/SubscriberListPage').then((module) => ({ default: module.SubscriberListPage })));
 
 const handle = { section: subscriberNav.label };
 const view = PERMISSIONS.VIEW_SUBSCRIBERS;

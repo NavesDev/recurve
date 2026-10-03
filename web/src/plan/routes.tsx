@@ -1,11 +1,15 @@
+import { lazy } from 'react';
 import type { RouteObject } from 'react-router';
 import { RequirePermission } from '../auth';
 import { PERMISSIONS } from '../shared/constants/permissions';
 import { ROUTE_PATTERNS } from '../shared/constants/routes';
 import { planNav } from './constants';
-import { PlanDetailPage } from './pages/PlanDetailPage';
-import { PlanEditPage, PlanNewPage } from './pages/PlanFormPage';
-import { PlanListPage } from './pages/PlanListPage';
+
+// Each screen is its own chunk, loaded when first opened.
+const PlanDetailPage = lazy(() => import('./pages/PlanDetailPage').then((module) => ({ default: module.PlanDetailPage })));
+const PlanEditPage = lazy(() => import('./pages/PlanFormPage').then((module) => ({ default: module.PlanEditPage })));
+const PlanNewPage = lazy(() => import('./pages/PlanFormPage').then((module) => ({ default: module.PlanNewPage })));
+const PlanListPage = lazy(() => import('./pages/PlanListPage').then((module) => ({ default: module.PlanListPage })));
 
 const handle = { section: planNav.label };
 

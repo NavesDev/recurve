@@ -47,13 +47,13 @@ class SubscriberSummaryTest {
         @Test
         void thePriceAndItsPlanAreCopiedSoTheListingCanFilterAndSortOnThem() {
             Plan plan = Plan.create("Pro", null, NOW);
-            PlanPrice price = plan.addPrice(new BigDecimal("499.00"), "USD", BillingInterval.YEARLY, NOW);
+            PlanPrice price = plan.addPrice(new BigDecimal("499.00"), "BRL", BillingInterval.YEARLY, NOW);
 
             SubscriberSummary summary = SubscriberSummary.of(Subscriber.start("Grace", "grace@navy.mil", price, NOW), plan);
 
             assertThat(summary.planId()).isEqualTo(plan.getId());
             assertThat(summary.planPriceId()).isEqualTo(price.getId());
-            assertThat(summary.currency()).isEqualTo("USD");
+            assertThat(summary.currency()).isEqualTo("BRL");
             assertThat(summary.interval()).isEqualTo(BillingInterval.YEARLY);
         }
 

@@ -97,14 +97,13 @@ class PlanTest {
         }
 
         @Test
-        void aPlanMayHaveSeveralActivePricesInDifferentCyclesOrCurrencies() {
+        void aPlanMayHaveSeveralActivePricesInDifferentCycles() {
             Plan plan = Plan.create("Pro", null, NOW);
 
             plan.addPrice(MONTHLY_AMOUNT, "BRL", BillingInterval.MONTHLY, NOW);
             plan.addPrice(new BigDecimal("499.00"), "BRL", BillingInterval.YEARLY, NOW);
-            plan.addPrice(new BigDecimal("9.90"), "USD", BillingInterval.MONTHLY, NOW);
 
-            assertThat(plan.getPrices()).hasSize(3).allMatch(PlanPrice::isActive);
+            assertThat(plan.getPrices()).hasSize(2).allMatch(PlanPrice::isActive);
         }
 
         @Test

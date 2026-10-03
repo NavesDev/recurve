@@ -53,7 +53,7 @@ class PlanSearchRepositoryIT {
         basic.addPrice(new BigDecimal("199.00"), "BRL", BillingInterval.YEARLY, NOW);
 
         Plan legacy = Plan.create("Legacy", null, NOW);
-        legacy.addPrice(new BigDecimal("9.90"), "USD", BillingInterval.MONTHLY, NOW);
+        legacy.addPrice(new BigDecimal("9.90"), "BRL", BillingInterval.MONTHLY, NOW);
         legacy.deactivate();
 
         List.of(pro, basic, legacy).forEach(plan -> repository.save(PlanSummary.of(plan)));

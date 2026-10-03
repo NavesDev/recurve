@@ -1,5 +1,7 @@
 package com.navesdev.recurve.plan.repository;
 
+import java.util.Collection;
+import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 import java.util.stream.Stream;
@@ -18,6 +20,14 @@ public interface PlanRepository extends BaseRepository<Plan, UUID> {
      */
     @Query("select p from Plan p join p.prices price where price.id = :priceId")
     Optional<Plan> findByPriceId(@Param("priceId") UUID priceId);
+
+    /**
+     * The plans holding any of these prices, each once. What a subscriber
+     * listing needs to show the price and the plan of a page of
+     * subscribers in one query.
+     */
+    @Query("select distinct p from Plan p join p.prices price where price.id in :priceIds")
+    List<Plan> findByPriceIds(@Param("priceIds") Collection<UUID> priceIds);
 
     /**
      * Every plan, for rebuilding the search index (FR-02.5) — not a

@@ -167,8 +167,10 @@ public class Subscriber {
         canceledAt = now;
     }
 
-    // arrives with the payment feature (FR-04.2)
-    public void confirmPayment(BillingInterval interval) {
+    public void confirmPayment(BillingInterval interval) {   // FR-04.2
+        if (status == SubscriberStatus.CANCELED) {
+            return;
+        }
         status = SubscriberStatus.ACTIVE;
         nextBillingAt = interval.advance(nextBillingAt);
     }
@@ -294,13 +296,16 @@ Spring Security, HTTP Basic, and **one rule per route family** in
 `SecurityConfig`:
 
 ```java
-.requestMatchers(HttpMethod.POST, "/api/users/reindex", "/api/plans/reindex", "/api/subscribers/reindex")
-        .hasAuthority("MANAGE_SYSTEM")
+.requestMatchers(HttpMethod.POST, "/api/webhooks/asaas").permitAll()   // only with Asaas; token checked in the controller
+.requestMatchers(HttpMethod.POST, "/api/users/reindex", "/api/plans/reindex", "/api/subscribers/reindex",
+        "/api/payments/reindex").hasAuthority("MANAGE_SYSTEM")
 .requestMatchers("/api/users/**").hasAuthority("MANAGE_USERS")
 .requestMatchers(HttpMethod.GET, "/api/plans/**").hasAuthority("VIEW_PLANS")
 .requestMatchers("/api/plans/**", "/api/prices/**").hasAuthority("MANAGE_PLANS")
 .requestMatchers(HttpMethod.GET, "/api/subscribers/**").hasAuthority("VIEW_SUBSCRIBERS")
 .requestMatchers("/api/subscribers/**").hasAuthority("MANAGE_SUBSCRIBERS")
+.requestMatchers(HttpMethod.GET, "/api/payments/**").hasAuthority("VIEW_PAYMENTS")
+.requestMatchers("/api/payments/**").hasAuthority("MANAGE_PAYMENTS")
 .anyRequest().authenticated()
 ```
 
@@ -364,24 +369,47 @@ the project grows, an ArchUnit test in `src/test` enforces these arrows.
 Payment gateway, email sending and the like: interface and implementation
 in the `gateway/` subpackage of the feature that uses them
 (`payment/gateway/PaymentGateway.java`,
-`payment/gateway/StripePaymentGateway.java`). The service depends on the
-interface.
+`payment/gateway/AsaasPaymentGateway.java`). The service depends on the
+interface. `recurve.payment.gateway` picks the implementation: `fake` (the
+default, `FakePaymentGateway`, charges nobody and needs no account) or
+`asaas`, whose URL, key and webhook token come from the environment and
+are checked at startup.
 
-The implementation catches the SDK exception and translates it to the
-exception declared by the interface:
+The implementation catches the client's exception and translates it to the
+exception declared by the interface, naming the operation and the status —
+never the key or the response body:
 
 ```java
-@Override
-public String charge(Subscriber subscriber, BigDecimal amount) {
+private static <T> T call(String operation, Supplier<T> request) {
     try {
-        return stripe.charges().create(...).getId();
-    } catch (StripeException e) {
-        throw new PaymentGatewayException("Stripe charge failed", e);
+        return request.get();
+    } catch (RestClientResponseException e) {
+        throw new PaymentGatewayException(
+                "Asaas refused to %s: HTTP %d".formatted(operation, e.getStatusCode().value()), e);
+    } catch (RestClientException e) {
+        throw new PaymentGatewayException("Asaas could not be reached to %s".formatted(operation), e);
     }
 }
 ```
 
-The service knows `PaymentGatewayException`, never `StripeException`.
+The service knows `PaymentGatewayException`, never `RestClientException`.
+
+**A gateway call is never made inside a database transaction.** It cannot
+be rolled back, and it would hold a pooled connection for as long as the
+gateway takes. A use case that talks to the gateway runs in steps, each
+database step its own transaction (`TransactionOperations`): record or
+check here, call the gateway, record what it answered. A charge is
+recorded before it is sent and carries its own id to the gateway as the
+external reference, so a send that fails halfway is retried
+(`POST /api/payments/{id}/send`) and finds the charge instead of creating
+a second one. Confirming and refunding call the gateway first and change
+nothing here if it refuses.
+
+**The webhook** (`POST /api/webhooks/asaas`) is the one route no operator
+calls. `SecurityConfig` lets it through only while Asaas is the gateway;
+the controller authenticates Asaas by the `asaas-access-token` header,
+compared in constant time. It answers 200 to events Recurve does not act
+on, so Asaas never pauses its queue over them.
 
 ## Failure
 
@@ -667,7 +695,8 @@ the aggregate cannot be persisted at all.
 | operators and their permissions | `V1__create_users.sql` |
 | plans and their prices | `V2__create_plans.sql` |
 | subscribers | `V3__create_subscribers.sql` |
-| payments | a separate one |
+| the subscriber's billing data | `V4__add_subscriber_billing_data.sql` |
+| payments | `V5__create_payments.sql` |
 | an index added to an existing table | a separate one |
 
 Boot 4 autoconfigures per technology, so the integration comes from
@@ -703,6 +732,11 @@ price never changes them (BR-04) and a subscriber never changes price.
 The amount is written as text and mapped as `scaled_float`, so it sorts
 as a number without passing through a `double`.
 
+The payment index too: `search/payments-settings.json`,
+`payments-mapping.json`, `PaymentIndexBootstrap`,
+`POST /api/payments/reindex`. It names the subscriber by id only, since a
+subscriber's name changes; `q` matches the gateway's id of a charge.
+
 `spring.elasticsearch.uris` follows the same placeholder pattern as the
 datasource (`${ES_URL:http://localhost:9230}`). Integration tests share
 the node and keep apart through `recurve.search.index-prefix: test-`.
@@ -724,7 +758,7 @@ generated setter would open a second door into the domain.
 | Command | `<Verb><Thing>Command` | `CreatePlanCommand` |
 | Repository | `<Thing>Repository` | `PlanRepository` |
 | External interface | `<Thing>Gateway`, `<Thing>Sender` | `PaymentGateway` |
-| External impl | `<Vendor><Interface>` | `StripePaymentGateway` |
+| External impl | `<Vendor><Interface>` | `AsaasPaymentGateway` |
 | Request/Response | `<Verb><Thing>Request`, `<Thing>Response` | `CreatePlanRequest` |
 | Controller | `<Thing>Controller` | `PlanController` |
 | Route | `/api/<things>` plural | `/api/plans` |

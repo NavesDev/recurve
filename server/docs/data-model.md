@@ -91,16 +91,16 @@ it was (BR-04).
 | planPriceId | UUID | `plan_price_id` | FK `plan_prices.id`, not null |
 | name | String | `name` | not null, at most 120 |
 | email | String | `email` | not null, at most 255, unique across every status (a canceled subscriber keeps it); trimmed and lower-cased |
+| document | String | `document varchar(14)` | CPF (11 digits) or CNPJ (14), digits only, check digits verified. Required by the domain; nullable in the schema for subscribers registered before it was (`V4`), who cannot be charged until it is filled in. Not unique |
+| gatewayCustomerId | String | `gateway_customer_id varchar(64)` | nullable; the subscriber's customer at the payment gateway, from the first charge sent |
 | status | SubscriberStatus | `status` | not null, enum as string |
 | startedAt | Instant | `started_at` | not null |
 | nextBillingAt | Instant | `next_billing_at` | not null. State, not a derivation: it changes only by an event (payment confirmed, price change, reactivation), always through a domain method |
 | canceledAt | Instant | `canceled_at` | nullable; filled exactly when `CANCELED` (a `CHECK` in the schema) |
 | createdAt | Instant | `created_at` | not null |
 
-No payment data yet. The gateway is **[open]** (FR-04.7); when it is
-chosen, a migration adds the gateway's customer id, and a tax document if
-the gateway needs one. Card data is never stored here: it stays with the
-gateway.
+Card data is never stored here: the customer pays on the gateway's
+invoice page, and whatever card it holds stays with it.
 
 
 ### SubscriberStatus (enum, `subscriber`)
@@ -115,18 +115,22 @@ gateway.
 
 Charge for one subscription cycle. `amount` and `currency` are a snapshot
 of the `PlanPrice` at creation time; the plan's price may change later
-without altering history.
+without altering history. One per cycle: `(subscriber_id, due_at)` is
+unique.
 
 | Field | Type | Column | Notes |
 |---|---|---|---|
 | id | UUID | `id` | PK |
 | subscriberId | UUID | `subscriber_id` | FK `subscribers.id`, not null |
-| amount | BigDecimal | `amount numeric(12,2)` | not null |
+| amount | BigDecimal | `amount numeric(12,2)` | not null, `> 0` |
 | currency | String | `currency varchar(3)` | not null |
 | status | PaymentStatus | `status` | not null, enum as string |
-| dueAt | Instant | `due_at` | not null |
-| paidAt | Instant | `paid_at` | nullable |
-| externalId | String | `external_id` | nullable. Transaction id at the payment gateway; used in webhook, refund and reconciliation. Empty for a manual payment |
+| dueAt | Instant | `due_at` | not null; the subscriber's `nextBillingAt` when the charge was requested |
+| paidAt | Instant | `paid_at` | filled exactly when `PAID` or `REFUNDED` (a `CHECK`) |
+| refundedAt | Instant | `refunded_at` | filled exactly when `REFUNDED` (a `CHECK`) |
+| externalId | String | `external_id varchar(64)` | nullable until sent; unique. The charge's id at the gateway; webhook and refund use it |
+| invoiceUrl | String | `invoice_url varchar(500)` | nullable until sent; where the customer pays |
+| version | Long | `version` | optimistic lock: the webhook and an operator may race. A lost race is a 409 |
 | createdAt | Instant | `created_at` | not null |
 
 
@@ -136,7 +140,7 @@ without altering history.
 |---|---|
 | `PENDING` | created, awaiting payment |
 | `PAID` | confirmed, `paidAt` filled in |
-| `FAILED` | gateway declined, or it fell due without payment |
+| `FAILED` | gateway declined, or it fell due without payment. May still be paid late, and then becomes `PAID` |
 | `REFUNDED` | reversed |
 
 ## Mapping conventions
@@ -170,9 +174,9 @@ is already filtered (sorting one page in memory is irrelevant).
 | `subscribers` | `plan_price_id` | btree | FK; filter by plan (FR-06.3); subscription count (FR-06.2) |
 | `subscribers` | `status` | btree | filter by status (FR-06.3) |
 | `subscribers` | `next_billing_at` | btree | billing job `WHERE next_billing_at <= now()` (FR-04.1) |
-| `payments` | `subscriber_id` | btree | FK; list by subscriber (FR-04.6) |
-| `payments` | `status` | btree | list by status (FR-04.6) |
-| `payments` | `external_id` | btree | webhook and reconciliation (FR-04.7) |
+| `payments` | `uq_payments_cycle` `(subscriber_id, due_at)` | unique constraint | one charge per cycle; its prefix serves the FK and "by subscriber" |
+| `payments` | `ix_payments_status` `(status)` | btree | by status (FR-04.6) |
+| `payments` | `uq_payments_external_id` `(external_id)` | unique constraint | webhook (FR-04.7) |
 
 Deliberately not indexed:
 
@@ -193,5 +197,6 @@ migrations produced; it never changes it.
 
 Migrations are versioned `V<n>__<description>.sql` and are immutable once
 merged: a correction is a new migration, never an edit of an applied one.
-`V1` creates the operator tables, `V2` the plan tables and `V3` the
-subscriber table; the table for `payment` comes with its feature.
+`V1` creates the operator tables, `V2` the plan tables, `V3` the
+subscriber table, `V4` adds the subscriber's billing data and `V5` creates
+the payment table.

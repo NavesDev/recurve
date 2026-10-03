@@ -47,7 +47,8 @@ names here are business terms, not code identifiers.
 
 ### FR-03 Subscribers
 
-- FR-03.1 Register a subscriber with name, unique email and a plan price.
+- FR-03.1 Register a subscriber with name, unique email, tax document (CPF
+  or CNPJ, which the payment gateway requires) and a plan price.
 - FR-03.2 New subscriber starts as active, with start date set to now and
   next billing date one cycle ahead, according to the chosen price.
 - FR-03.3 Cancel a subscriber. Status becomes canceled and cancellation
@@ -60,20 +61,26 @@ names here are business terms, not code identifiers.
 
 ### FR-04 Payments
 
-- FR-04.1 Generate a pending charge for a subscriber when the next billing
-  date is reached. Amount and currency are copied from the price at that
-  moment.
+- FR-04.1 Generate a pending charge for a subscriber's current cycle (its
+  next billing date). Amount and currency are copied from the price at that
+  moment. For now an operator requests it, one cycle at a time; generating
+  it automatically when the date is reached is **[open]** until scheduled
+  jobs have an architecture.
 - FR-04.2 Confirm a payment: status becomes paid, payment date is
   recorded, subscriber becomes or stays active, next billing date advances
   one cycle.
 - FR-04.3 Record a failure: status becomes failed. Subscriber becomes past
   due.
 - FR-04.4 Refund a paid payment: status becomes refunded.
-- FR-04.5 Record a manual payment (no gateway involved).
+- FR-04.5 Record a manual payment: the customer paid outside the gateway.
+  The cycle's pending charge is confirmed, and the gateway is told so it
+  stops charging.
 - FR-04.6 List payments by subscriber and by status.
-- FR-04.7 **[open]** Gateway integration: create charge, receive
-  confirmation/failure webhook, match the payment by the gateway's
-  transaction id.
+- FR-04.7 Gateway integration, with Asaas: create the charge (the customer
+  chooses Pix, boleto or card on the gateway's invoice page), receive the
+  confirmation/failure webhook, match the payment by our id carried as the
+  gateway's external reference or by the gateway's id. A charge the gateway
+  did not take can be sent again without charging twice.
 - FR-04.8 **[open]** Retry policy and grace period before a past-due
   subscriber is canceled.
 
@@ -206,7 +213,7 @@ active ──charge fails──► past due ──payment confirmed──► act
   than 72 bytes is rejected rather than silently truncated.
 - NFR-05 Timestamps in UTC.
 - NFR-06 Monetary amounts with two decimal places; currency as ISO 4217
-  code.
+  code, and for now BRL only: the one the payment gateway charges in.
 - NFR-07 Business logic testable without database and without HTTP.
 - NFR-08 Schema migrations with Flyway. The migration is the source of
   truth; the application only validates the mapping against it and never

@@ -29,7 +29,7 @@ class SubscriberSummaryTest {
         void everyFieldOfTheSubscriberIsShown() {
             Plan plan = Plan.create("Pro", null, NOW);
             PlanPrice price = plan.addPrice(new BigDecimal("49.90"), "BRL", BillingInterval.MONTHLY, NOW);
-            Subscriber subscriber = Subscriber.start("Grace", "grace@navy.mil", price, NOW);
+            Subscriber subscriber = Subscriber.start("Grace", "grace@navy.mil", "52998224725", price, NOW);
             subscriber.cancel(LATER);
 
             SubscriberSummary summary = SubscriberSummary.of(subscriber, plan);
@@ -37,6 +37,7 @@ class SubscriberSummaryTest {
             assertThat(summary.id()).isEqualTo(subscriber.getId());
             assertThat(summary.name()).isEqualTo("Grace");
             assertThat(summary.email()).isEqualTo("grace@navy.mil");
+            assertThat(summary.taxDocument()).isEqualTo("52998224725");
             assertThat(summary.status()).isEqualTo(SubscriberStatus.CANCELED);
             assertThat(summary.startedAt()).isEqualTo(NOW);
             assertThat(summary.nextBillingAt()).isEqualTo(subscriber.getNextBillingAt());
@@ -47,13 +48,13 @@ class SubscriberSummaryTest {
         @Test
         void thePriceAndItsPlanAreCopiedSoTheListingCanFilterAndSortOnThem() {
             Plan plan = Plan.create("Pro", null, NOW);
-            PlanPrice price = plan.addPrice(new BigDecimal("499.00"), "USD", BillingInterval.YEARLY, NOW);
+            PlanPrice price = plan.addPrice(new BigDecimal("499.00"), "BRL", BillingInterval.YEARLY, NOW);
 
-            SubscriberSummary summary = SubscriberSummary.of(Subscriber.start("Grace", "grace@navy.mil", price, NOW), plan);
+            SubscriberSummary summary = SubscriberSummary.of(Subscriber.start("Grace", "grace@navy.mil", "52998224725", price, NOW), plan);
 
             assertThat(summary.planId()).isEqualTo(plan.getId());
             assertThat(summary.planPriceId()).isEqualTo(price.getId());
-            assertThat(summary.currency()).isEqualTo("USD");
+            assertThat(summary.currency()).isEqualTo("BRL");
             assertThat(summary.interval()).isEqualTo(BillingInterval.YEARLY);
         }
 
@@ -62,7 +63,7 @@ class SubscriberSummaryTest {
             Plan plan = Plan.create("Pro", null, NOW);
             PlanPrice price = plan.addPrice(new BigDecimal("49.9"), "BRL", BillingInterval.MONTHLY, NOW);
 
-            assertThat(SubscriberSummary.of(Subscriber.start("Grace", "grace@navy.mil", price, NOW), plan).price())
+            assertThat(SubscriberSummary.of(Subscriber.start("Grace", "grace@navy.mil", "52998224725", price, NOW), plan).price())
                     .isEqualTo("49.90");
         }
 
@@ -71,7 +72,7 @@ class SubscriberSummaryTest {
             // BR-04: the subscriber stays on the price it chose.
             Plan plan = Plan.create("Pro", null, NOW);
             PlanPrice old = plan.addPrice(new BigDecimal("49.90"), "BRL", BillingInterval.MONTHLY, NOW);
-            Subscriber subscriber = Subscriber.start("Grace", "grace@navy.mil", old, NOW);
+            Subscriber subscriber = Subscriber.start("Grace", "grace@navy.mil", "52998224725", old, NOW);
             plan.replacePrice(old.getId(), new BigDecimal("59.90"), LATER);
 
             assertThat(SubscriberSummary.of(subscriber, plan).price()).isEqualTo("49.90");
@@ -81,7 +82,7 @@ class SubscriberSummaryTest {
         void aPlanThatDoesNotHoldThePriceIsAMistake() {
             Plan plan = Plan.create("Pro", null, NOW);
             PlanPrice price = plan.addPrice(new BigDecimal("49.90"), "BRL", BillingInterval.MONTHLY, NOW);
-            Subscriber subscriber = Subscriber.start("Grace", "grace@navy.mil", price, NOW);
+            Subscriber subscriber = Subscriber.start("Grace", "grace@navy.mil", "52998224725", price, NOW);
 
             assertThatThrownBy(() -> SubscriberSummary.of(subscriber, Plan.create("Basic", null, NOW)))
                     .isInstanceOf(PriceNotFoundException.class);

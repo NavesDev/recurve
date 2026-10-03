@@ -105,8 +105,15 @@ class PlanValidatorTest {
     }
 
     @Nested
-    @DisplayName("NFR-06 a currency is an ISO 4217 code")
+    @DisplayName("NFR-06 a currency is BRL, the one the gateway charges in")
     class CurrencyCode {
+
+        @ParameterizedTest
+        @ValueSource(strings = { "USD", "EUR", "usd" })
+        void aRealCurrencyOtherThanBrlIsRefused(String code) {
+            assertThatThrownBy(() -> PlanValidator.currency(code))
+                    .isInstanceOf(InvalidPlanException.class).hasMessageContaining("BRL");
+        }
 
         @Test
         void aCodeIsStoredUpperCased() {

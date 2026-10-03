@@ -27,6 +27,9 @@ public final class PlanValidator {
     public static final int PRICE_INTEGER_DIGITS = 10;
     public static final int PRICE_FRACTION_DIGITS = 2;
 
+    /** NFR-06: the only currency a price may be in. */
+    public static final String SUPPORTED_CURRENCY = "BRL";
+
     /** The shape the edge checks; whether the code is a currency is decided here. */
     public static final String CURRENCY_PATTERN = "^[A-Za-z]{3}$";
 
@@ -74,13 +77,22 @@ public final class PlanValidator {
         return normalized;
     }
 
-    /** An ISO 4217 code the JDK knows, upper-cased: {@code brl} is {@code BRL}. */
+    /**
+     * NFR-06: an ISO 4217 code the JDK knows, upper-cased ({@code brl} is
+     * {@code BRL}) — and, for now, BRL only: it is the one currency the
+     * payment gateway charges in, and a price nobody can be charged at
+     * serves no one.
+     */
     public static String currency(String currency) {
         String code = currency == null ? "" : currency.trim().toUpperCase(Locale.ROOT);
         boolean known = Currency.getAvailableCurrencies().stream()
                 .anyMatch(candidate -> candidate.getCurrencyCode().equals(code));
         if (!known) {
             throw new InvalidPlanException("currency must be an ISO 4217 code, got '%s'".formatted(code));
+        }
+        if (!SUPPORTED_CURRENCY.equals(code)) {
+            throw new InvalidPlanException(
+                    "currency must be %s, the one the payment gateway charges in, got '%s'".formatted(SUPPORTED_CURRENCY, code));
         }
         return code;
     }

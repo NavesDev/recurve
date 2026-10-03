@@ -13,9 +13,12 @@ public record UpdateSubscriberRequest(
 
         @NotBlank @Size(max = SubscriberValidator.NAME_MAX_LENGTH) String name,
 
-        @NotBlank @Email @Size(max = SubscriberValidator.EMAIL_MAX_LENGTH) String email) {
+        @NotBlank @Email @Size(max = SubscriberValidator.EMAIL_MAX_LENGTH) String email,
+
+        /** CPF or CNPJ, with or without punctuation; its check digits are the domain's to judge. */
+        @NotBlank @Size(max = SubscriberValidator.DOCUMENT_MAX_LENGTH) String document) {
 
     public UpdateSubscriberCommand toCommand(UUID id) {
-        return new UpdateSubscriberCommand(id, name, email);
+        return new UpdateSubscriberCommand(id, name, email, document);
     }
 }

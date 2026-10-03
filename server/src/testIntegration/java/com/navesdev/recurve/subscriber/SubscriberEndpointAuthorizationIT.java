@@ -93,7 +93,7 @@ class SubscriberEndpointAuthorizationIT {
         PlanPrice price = plan.addPrice(new BigDecimal("49.90"), "BRL", BillingInterval.MONTHLY, NOW);
         planRepository.save(plan);
         priceId = price.getId();
-        Subscriber grace = subscriberRepository.save(Subscriber.start("Grace", "grace@navy.mil", price, NOW));
+        Subscriber grace = subscriberRepository.save(Subscriber.start("Grace", "grace@navy.mil", "52998224725", price, NOW));
         subscriberId = subscriberSearchRepository.save(SubscriberSummary.of(grace, plan)).id();
         entityManager.flush();
     }
@@ -113,7 +113,7 @@ class SubscriberEndpointAuthorizationIT {
             mvc.perform(post("/api/subscribers").with(as("viewer")).contentType(MediaType.APPLICATION_JSON)
                     .content(newSubscriber())).andExpect(status().isForbidden());
             mvc.perform(put("/api/subscribers/{id}", subscriberId).with(as("viewer")).contentType(MediaType.APPLICATION_JSON)
-                    .content("{\"name\":\"Grace\",\"email\":\"gbh@navy.mil\"}")).andExpect(status().isForbidden());
+                    .content("{\"name\":\"Grace\",\"email\":\"gbh@navy.mil\",\"document\":\"52998224725\"}")).andExpect(status().isForbidden());
             mvc.perform(delete("/api/subscribers/{id}", subscriberId).with(as("viewer"))).andExpect(status().isForbidden());
         }
     }
@@ -135,7 +135,7 @@ class SubscriberEndpointAuthorizationIT {
                     .content(newSubscriber()))
                     .andExpect(status().isCreated());
             mvc.perform(put("/api/subscribers/{id}", subscriberId).with(as("manager")).contentType(MediaType.APPLICATION_JSON)
-                    .content("{\"name\":\"Grace B. Hopper\",\"email\":\"gbh@navy.mil\"}"))
+                    .content("{\"name\":\"Grace B. Hopper\",\"email\":\"gbh@navy.mil\",\"document\":\"52998224725\"}"))
                     .andExpect(status().isOk());
             mvc.perform(delete("/api/subscribers/{id}", subscriberId).with(as("manager")))
                     .andExpect(status().isOk())
@@ -146,7 +146,7 @@ class SubscriberEndpointAuthorizationIT {
         void anEmailInUseIsABusinessRuleViolation() throws Exception {
             mvc.perform(post("/api/subscribers").with(as("manager")).contentType(MediaType.APPLICATION_JSON)
                     .content("""
-                            {"name":"Grace","email":"GRACE@navy.mil","planPriceId":"%s"}
+                            {"name":"Grace","email":"GRACE@navy.mil","document":"52998224725","planPriceId":"%s"}
                             """.formatted(priceId)))
                     .andExpect(status().isUnprocessableEntity());
         }
@@ -183,7 +183,7 @@ class SubscriberEndpointAuthorizationIT {
 
     private String newSubscriber() {
         return """
-                {"name":"Ada","email":"ada@engine.org","planPriceId":"%s"}
+                {"name":"Ada","email":"ada@engine.org","document":"52998224725","planPriceId":"%s"}
                 """.formatted(priceId);
     }
 

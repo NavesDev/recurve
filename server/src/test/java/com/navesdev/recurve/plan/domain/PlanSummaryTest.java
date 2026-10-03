@@ -73,15 +73,6 @@ class PlanSummaryTest {
         }
 
         @Test
-        void aCycleSoldInSeveralCurrenciesIsListedOnce() {
-            Plan plan = Plan.create("Pro", null, NOW);
-            plan.addPrice(new BigDecimal("49.90"), "BRL", BillingInterval.MONTHLY, NOW);
-            plan.addPrice(new BigDecimal("9.90"), "USD", BillingInterval.MONTHLY, NOW);
-
-            assertThat(PlanSummary.of(plan).activeIntervals()).containsExactly(BillingInterval.MONTHLY);
-        }
-
-        @Test
         void aPlanWithNoActivePriceIsOnSaleInNoCycle() {
             assertThat(PlanSummary.of(Plan.create("Pro", null, NOW)).activeIntervals()).isEmpty();
         }

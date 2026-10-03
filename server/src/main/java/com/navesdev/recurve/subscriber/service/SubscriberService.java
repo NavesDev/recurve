@@ -57,7 +57,7 @@ public class SubscriberService {
         }
         Plan plan = planService.findForSubscription(command.planPriceId());
         Subscriber subscriber = Subscriber.start(
-                command.name(), email, plan.price(command.planPriceId()), clock.instant());
+                command.name(), email, command.document(), plan.price(command.planPriceId()), clock.instant());
         return persist(subscriber, plan);
     }
 
@@ -67,7 +67,7 @@ public class SubscriberService {
         if (!subscriber.getEmail().equals(email) && repository.existsByEmailAndIdNot(email, subscriber.getId())) {
             throw new SubscriberEmailAlreadyInUseException(email);
         }
-        subscriber.update(command.name(), email);
+        subscriber.update(command.name(), email, command.document());
         return persist(subscriber, planOf(subscriber));
     }
 
@@ -75,6 +75,34 @@ public class SubscriberService {
     public SubscriberSummary cancel(UUID id) {
         Subscriber subscriber = findOrThrow(id);
         subscriber.cancel(clock.instant());
+        return persist(subscriber, planOf(subscriber));
+    }
+
+    /** The subscriber itself, for the payment feature to charge (FR-04.1). */
+    @Transactional(readOnly = true)
+    public Subscriber findForBilling(UUID id) {
+        return findOrThrow(id);
+    }
+
+    /** FR-04.7: the customer the subscriber became at the payment gateway. */
+    public void attachGatewayCustomer(UUID id, String customerId) {
+        Subscriber subscriber = findOrThrow(id);
+        subscriber.attachGatewayCustomer(customerId);
+        repository.save(subscriber);
+    }
+
+    /** FR-04.2: a cycle was paid; the next charge moves one cycle of the subscriber's price. */
+    public SubscriberSummary confirmPayment(UUID id) {
+        Subscriber subscriber = findOrThrow(id);
+        Plan plan = planOf(subscriber);
+        subscriber.confirmPayment(plan.price(subscriber.getPlanPriceId()).getInterval());
+        return persist(subscriber, plan);
+    }
+
+    /** FR-04.3: a charge fell due unpaid. */
+    public SubscriberSummary markPastDue(UUID id) {
+        Subscriber subscriber = findOrThrow(id);
+        subscriber.markPastDue();
         return persist(subscriber, planOf(subscriber));
     }
 

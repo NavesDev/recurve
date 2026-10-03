@@ -30,6 +30,15 @@ recurve:
     # contract is only a shape; a call through the UI still needs Basic
     # Auth. Turn off in production.
     enabled: ${DOCS_ENABLED:true}
+  payment:
+    # FR-04.7: "fake" (the default) charges nobody and needs no account;
+    # "asaas" talks to Asaas, and then the three settings below are required
+    # or the application does not start. The URL defaults to the sandbox.
+    gateway: ${PAYMENT_GATEWAY:fake}
+    asaas:
+      api-url: ${ASAAS_API_URL:https://api-sandbox.asaas.com/v3}
+      api-key: ${ASAAS_API_KEY:}
+      webhook-token: ${ASAAS_WEBHOOK_TOKEN:}
   bootstrap:
     admin:
       email: ${BOOTSTRAP_ADMIN_EMAIL:}

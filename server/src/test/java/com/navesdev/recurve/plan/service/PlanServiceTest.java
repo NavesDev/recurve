@@ -2,6 +2,7 @@ package com.navesdev.recurve.plan.service;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.assertj.core.api.Assertions.entry;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.argThat;
 import static org.mockito.Mockito.doThrow;
@@ -16,6 +17,7 @@ import java.time.Instant;
 import java.time.ZoneOffset;
 import java.util.List;
 import java.util.Optional;
+import java.util.Set;
 import java.util.UUID;
 import java.util.stream.Stream;
 
@@ -36,6 +38,7 @@ import com.navesdev.recurve.plan.domain.BillingInterval;
 import com.navesdev.recurve.plan.domain.Plan;
 import com.navesdev.recurve.plan.domain.PlanPrice;
 import com.navesdev.recurve.plan.domain.PlanSummary;
+import com.navesdev.recurve.plan.domain.exception.PlanInactiveException;
 import com.navesdev.recurve.plan.domain.exception.PlanNotFoundException;
 import com.navesdev.recurve.plan.domain.exception.PriceAlreadyActiveException;
 import com.navesdev.recurve.plan.domain.exception.PriceNotFoundException;
@@ -260,6 +263,71 @@ class PlanServiceTest {
             assertThat(service.reindex()).isZero();
             verify(searchRepository).recreateIndex();
             verify(searchRepository, never()).saveAll(any());
+        }
+    }
+
+    @Nested
+    @DisplayName("What the subscriber feature asks of a plan")
+    class ForSubscribers {
+
+        @Test
+        void aPriceOnSaleLeadsToThePlanHoldingIt() {
+            Plan plan = Plan.create("Pro", null, EARLIER);
+            PlanPrice price = plan.addPrice(AMOUNT, "BRL", BillingInterval.MONTHLY, EARLIER);
+            when(repository.findByPriceId(price.getId())).thenReturn(Optional.of(plan));
+
+            assertThat(service.findForSubscription(price.getId())).isSameAs(plan);
+        }
+
+        @Test
+        void aPriceNoLongerOnSaleIsRefused() {
+            Plan plan = Plan.create("Pro", null, EARLIER);
+            PlanPrice price = plan.addPrice(AMOUNT, "BRL", BillingInterval.MONTHLY, EARLIER);
+            plan.deactivate();
+            when(repository.findByPriceId(price.getId())).thenReturn(Optional.of(plan));
+
+            assertThatThrownBy(() -> service.findForSubscription(price.getId()))
+                    .isInstanceOf(PlanInactiveException.class);
+        }
+
+        @Test
+        void aPriceNobodyHoldsIsNotFound() {
+            UUID priceId = UUID.randomUUID();
+            when(repository.findByPriceId(priceId)).thenReturn(Optional.empty());
+
+            assertThatThrownBy(() -> service.findForSubscription(priceId))
+                    .isInstanceOf(PriceNotFoundException.class);
+        }
+
+        @Test
+        void eachPriceLeadsToItsPlan() {
+            Plan pro = Plan.create("Pro", null, EARLIER);
+            PlanPrice proMonthly = pro.addPrice(AMOUNT, "BRL", BillingInterval.MONTHLY, EARLIER);
+            PlanPrice proYearly = pro.addPrice(new BigDecimal("499.00"), "BRL", BillingInterval.YEARLY, EARLIER);
+            Plan basic = Plan.create("Basic", null, EARLIER);
+            PlanPrice basicMonthly = basic.addPrice(new BigDecimal("9.90"), "BRL", BillingInterval.MONTHLY, EARLIER);
+            Set<UUID> priceIds = Set.of(proMonthly.getId(), proYearly.getId(), basicMonthly.getId());
+            when(repository.findByPriceIds(priceIds)).thenReturn(List.of(pro, basic));
+
+            assertThat(service.findByPriceIds(priceIds)).containsOnly(
+                    entry(proMonthly.getId(), pro), entry(proYearly.getId(), pro), entry(basicMonthly.getId(), basic));
+        }
+
+        @Test
+        void aPriceNobodyHoldsIsAMissingPlan() {
+            // Every subscriber's price exists (a foreign key says so); one
+            // that does not is a broken database, not an empty answer.
+            UUID priceId = UUID.randomUUID();
+            when(repository.findByPriceIds(Set.of(priceId))).thenReturn(List.of());
+
+            assertThatThrownBy(() -> service.findByPriceIds(Set.of(priceId)))
+                    .isInstanceOf(PriceNotFoundException.class);
+        }
+
+        @Test
+        void noPriceAsksNothing() {
+            assertThat(service.findByPriceIds(Set.of())).isEmpty();
+            verifyNoInteractions(repository);
         }
     }
 

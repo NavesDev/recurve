@@ -8,6 +8,11 @@ spring:
     url: ${TEST_DB_URL:jdbc:postgresql://localhost:54330/recurve-test}
     username: ${DB_USER:postgres}
     password: ${DB_PASSWORD:postgres}
+    # Spring caches one context per distinct test configuration, each with
+    # its own pool. A small pool keeps all of them under PostgreSQL's
+    # connection limit; no test here needs more than a couple at once.
+    hikari:
+      maximum-pool-size: 3
   elasticsearch:
     uris: ${TEST_ES_URL:http://localhost:9230}
   flyway:

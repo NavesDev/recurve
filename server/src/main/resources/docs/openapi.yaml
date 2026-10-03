@@ -18,6 +18,8 @@ tags:
   - name: Plans
   - name: Prices
   - name: Subscribers
+  - name: Payments
+  - name: Webhooks
 
 security:
   - basicAuth: []
@@ -771,6 +773,275 @@ paths:
         '503':
           $ref: '#/components/responses/ServiceUnavailable'
 
+  /api/payments:
+
+    post:
+      tags: [Payments]
+      operationId: requestPayment
+      summary: Charge a subscriber's current cycle
+      description: Records the charge and sends it to the payment gateway. If the gateway fails, the charge stays recorded and unsent (502); `POST /api/payments/{id}/send` retries.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RequestPaymentRequest'
+      responses:
+        '201':
+          description: Created
+          headers:
+            Location:
+              schema:
+                type: string
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaymentResponse'
+              examples:
+                payment:
+                  $ref: '#/components/examples/payment'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
+        '422':
+          $ref: '#/components/responses/UnprocessableEntity'
+        '502':
+          $ref: '#/components/responses/BadGateway'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
+
+    get:
+      tags: [Payments]
+      operationId: searchPayments
+      summary: List payments
+      parameters:
+        - $ref: '#/components/parameters/q'
+        - $ref: '#/components/parameters/filter'
+        - $ref: '#/components/parameters/page'
+        - $ref: '#/components/parameters/size'
+        - $ref: '#/components/parameters/sort'
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaymentPage'
+              example:
+                items:
+                  - id: 2b1a0f9e-8d7c-4b6a-9e5d-4c3b2a1f0e9d
+                    subscriberId: 5e4d3c2b-1a09-4f8e-9d7c-6b5a4f3e2d1c
+                    amount: 49.90
+                    currency: BRL
+                    status: PENDING
+                    dueAt: '2026-02-15T10:00:00Z'
+                    externalId: pay_080225913252
+                    invoiceUrl: https://sandbox.asaas.com/i/080225913252
+                    createdAt: '2026-02-10T09:00:00Z'
+                page: 0
+                size: 20
+                total: 1
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '502':
+          $ref: '#/components/responses/BadGateway'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
+
+  /api/payments/{id}:
+
+    parameters:
+      - $ref: '#/components/parameters/paymentId'
+
+    get:
+      tags: [Payments]
+      operationId: findPayment
+      summary: Get a payment
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaymentResponse'
+              examples:
+                payment:
+                  $ref: '#/components/examples/payment'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
+
+  /api/payments/{id}/send:
+
+    parameters:
+      - $ref: '#/components/parameters/paymentId'
+
+    post:
+      tags: [Payments]
+      operationId: sendPayment
+      summary: Send a charge to the payment gateway
+      description: Retries a send that failed. A charge already sent is returned as it is.
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaymentResponse'
+              examples:
+                payment:
+                  $ref: '#/components/examples/payment'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
+        '422':
+          $ref: '#/components/responses/UnprocessableEntity'
+        '502':
+          $ref: '#/components/responses/BadGateway'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
+
+  /api/payments/{id}/confirm:
+
+    parameters:
+      - $ref: '#/components/parameters/paymentId'
+
+    post:
+      tags: [Payments]
+      operationId: confirmPayment
+      summary: Confirm a payment received outside the gateway
+      description: The gateway is told first; if it refuses (502), nothing changes. The subscriber becomes active and its next billing date advances one cycle.
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaymentResponse'
+              examples:
+                payment:
+                  $ref: '#/components/examples/payment'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
+        '422':
+          $ref: '#/components/responses/UnprocessableEntity'
+        '502':
+          $ref: '#/components/responses/BadGateway'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
+
+  /api/payments/{id}/refund:
+
+    parameters:
+      - $ref: '#/components/parameters/paymentId'
+
+    post:
+      tags: [Payments]
+      operationId: refundPayment
+      summary: Refund a paid payment
+      description: The gateway gives it back first; if it refuses (502), nothing changes.
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaymentResponse'
+              examples:
+                payment:
+                  $ref: '#/components/examples/payment'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
+        '422':
+          $ref: '#/components/responses/UnprocessableEntity'
+        '502':
+          $ref: '#/components/responses/BadGateway'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
+
+  /api/payments/reindex:
+
+    post:
+      tags: [Payments]
+      operationId: reindexPayments
+      summary: Rebuild the payment search index
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ReindexResponse'
+              example:
+                indexed: 1200
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
+
+  /api/webhooks/asaas:
+
+    post:
+      tags: [Webhooks]
+      operationId: receiveAsaasEvent
+      summary: Receive an event from Asaas
+      description: Called by Asaas, not by an operator. Authenticated by the `asaas-access-token` header, not by HTTP Basic. Exists only when the gateway is Asaas. Events Recurve does not act on, or about charges it does not hold, are still answered 200.
+      security: []
+      parameters:
+        - name: asaas-access-token
+          in: header
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AsaasEvent'
+      responses:
+        '200':
+          description: OK
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
+
 components:
 
   securitySchemes:
@@ -797,6 +1068,14 @@ components:
         format: uuid
 
     priceId:
+      name: id
+      in: path
+      required: true
+      schema:
+        type: string
+        format: uuid
+
+    paymentId:
       name: id
       in: path
       required: true
@@ -1235,6 +1514,102 @@ components:
           format: int64
           minimum: 0
 
+    PaymentStatus:
+      type: string
+      enum:
+        - PENDING
+        - PAID
+        - FAILED
+        - REFUNDED
+
+    RequestPaymentRequest:
+      type: object
+      required: [subscriberId]
+      properties:
+        subscriberId:
+          type: string
+          format: uuid
+
+    PaymentResponse:
+      type: object
+      required: [id, subscriberId, amount, currency, status, dueAt, createdAt]
+      properties:
+        id:
+          type: string
+          format: uuid
+        subscriberId:
+          type: string
+          format: uuid
+        amount:
+          type: number
+          minimum: 0.01
+          maximum: 9999999999.99
+        currency:
+          type: string
+          pattern: '^[A-Z]{3}$'
+        status:
+          $ref: '#/components/schemas/PaymentStatus'
+        dueAt:
+          type: string
+          format: date-time
+        paidAt:
+          type: string
+          format: date-time
+          nullable: true
+        refundedAt:
+          type: string
+          format: date-time
+          nullable: true
+        externalId:
+          type: string
+          nullable: true
+          description: the charge's id at the payment gateway; absent until it is sent
+        invoiceUrl:
+          type: string
+          nullable: true
+          description: where the customer pays the charge
+        createdAt:
+          type: string
+          format: date-time
+
+    PaymentPage:
+      type: object
+      required: [items, page, size, total]
+      properties:
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/PaymentResponse'
+        page:
+          type: integer
+          minimum: 0
+        size:
+          type: integer
+          minimum: 1
+        total:
+          type: integer
+          format: int64
+          minimum: 0
+
+    AsaasEvent:
+      type: object
+      description: Asaas's webhook body; only `event` and `payment.id`/`payment.externalReference` are read, everything else is ignored.
+      required: [event]
+      additionalProperties: true
+      properties:
+        event:
+          type: string
+          example: PAYMENT_RECEIVED
+        payment:
+          type: object
+          additionalProperties: true
+          properties:
+            id:
+              type: string
+            externalReference:
+              type: string
+              nullable: true
+
     ReindexResponse:
       type: object
       required: [indexed]
@@ -1312,3 +1687,15 @@ components:
         startedAt: '2026-01-15T10:00:00Z'
         nextBillingAt: '2026-02-15T10:00:00Z'
         createdAt: '2026-01-15T10:00:00Z'
+
+    payment:
+      value:
+        id: 2b1a0f9e-8d7c-4b6a-9e5d-4c3b2a1f0e9d
+        subscriberId: 5e4d3c2b-1a09-4f8e-9d7c-6b5a4f3e2d1c
+        amount: 49.90
+        currency: BRL
+        status: PENDING
+        dueAt: '2026-02-15T10:00:00Z'
+        externalId: pay_080225913252
+        invoiceUrl: https://sandbox.asaas.com/i/080225913252
+        createdAt: '2026-02-10T09:00:00Z'

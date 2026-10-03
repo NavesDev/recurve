@@ -11,11 +11,18 @@ import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.boot.test.context.TestConfiguration;
 import org.springframework.boot.webmvc.test.autoconfigure.WebMvcTest;
+import org.springframework.context.annotation.Bean;
+import org.springframework.context.annotation.Import;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.web.servlet.mvc.method.RequestMappingInfo;
 import org.springframework.web.servlet.mvc.method.annotation.RequestMappingHandlerMapping;
 
+import com.navesdev.recurve.payment.controller.AsaasWebhookController;
+import com.navesdev.recurve.payment.controller.PaymentController;
+import com.navesdev.recurve.payment.gateway.AsaasProperties;
+import com.navesdev.recurve.payment.service.PaymentService;
 import com.navesdev.recurve.plan.controller.PlanController;
 import com.navesdev.recurve.plan.controller.PriceController;
 import com.navesdev.recurve.plan.service.PlanService;
@@ -38,8 +45,19 @@ import io.swagger.v3.parser.core.models.SwaggerParseResult;
  * exactly the routes the controllers map.
  */
 @WebMvcTest(controllers = { UserController.class, PlanController.class, PriceController.class,
-        SubscriberController.class })
+        SubscriberController.class, PaymentController.class, AsaasWebhookController.class },
+        // The webhook only exists with Asaas as the gateway; the contract describes it.
+        properties = "recurve.payment.gateway=asaas")
+@Import(ApiContractTest.Asaas.class)
 class ApiContractTest {
+
+    @TestConfiguration
+    static class Asaas {
+        @Bean
+        AsaasProperties asaasProperties() {
+            return new AsaasProperties("https://api-sandbox.asaas.com/v3", "unused", "unused-webhook-token");
+        }
+    }
 
     private static final String CONTRACT = "docs/openapi.yaml";
 
@@ -56,6 +74,9 @@ class ApiContractTest {
 
     @MockitoBean
     private SubscriberService subscriberService;
+
+    @MockitoBean
+    private PaymentService paymentService;
 
     @MockitoBean
     private ListingRequests listingRequests;

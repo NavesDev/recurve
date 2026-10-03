@@ -195,6 +195,54 @@ class SubscriberServiceTest {
     }
 
     @Nested
+    @DisplayName("What the payment feature asks of a subscriber")
+    class ForPayments {
+
+        @Test
+        void theSubscriberToChargeIsTheEntity() {
+            Subscriber subscriber = stored();
+
+            assertThat(service.findForBilling(subscriber.getId())).isSameAs(subscriber);
+        }
+
+        @Test
+        void theGatewayCustomerIsRecorded() {
+            Subscriber subscriber = stored();
+            savesWhatItIsGiven();
+
+            service.attachGatewayCustomer(subscriber.getId(), "cus_000005219613");
+
+            assertThat(subscriber.getGatewayCustomerId()).isEqualTo("cus_000005219613");
+            verify(repository).save(subscriber);
+        }
+
+        @Test
+        void aConfirmedPaymentMovesTheSubscriberOneCycleOfItsPriceAndReachesTheIndex() {
+            Subscriber subscriber = stored();
+            Instant before = subscriber.getNextBillingAt();
+            knowsThePlan();
+            savesWhatItIsGiven();
+
+            SubscriberSummary confirmed = service.confirmPayment(subscriber.getId());
+
+            assertThat(subscriber.getNextBillingAt()).isEqualTo(BillingInterval.MONTHLY.advance(before));
+            verify(searchRepository).save(confirmed);
+        }
+
+        @Test
+        void aFailedPaymentLeavesTheSubscriberPastDueInTheIndexToo() {
+            Subscriber subscriber = stored();
+            knowsThePlan();
+            savesWhatItIsGiven();
+
+            SubscriberSummary pastDue = service.markPastDue(subscriber.getId());
+
+            assertThat(pastDue.status()).isEqualTo(SubscriberStatus.PAST_DUE);
+            verify(searchRepository).save(pastDue);
+        }
+    }
+
+    @Nested
     @DisplayName("What does not exist")
     class Missing {
 

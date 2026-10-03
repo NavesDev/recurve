@@ -78,6 +78,34 @@ public class SubscriberService {
         return persist(subscriber, planOf(subscriber));
     }
 
+    /** The subscriber itself, for the payment feature to charge (FR-04.1). */
+    @Transactional(readOnly = true)
+    public Subscriber findForBilling(UUID id) {
+        return findOrThrow(id);
+    }
+
+    /** FR-04.7: the customer the subscriber became at the payment gateway. */
+    public void attachGatewayCustomer(UUID id, String customerId) {
+        Subscriber subscriber = findOrThrow(id);
+        subscriber.attachGatewayCustomer(customerId);
+        repository.save(subscriber);
+    }
+
+    /** FR-04.2: a cycle was paid; the next charge moves one cycle of the subscriber's price. */
+    public SubscriberSummary confirmPayment(UUID id) {
+        Subscriber subscriber = findOrThrow(id);
+        Plan plan = planOf(subscriber);
+        subscriber.confirmPayment(plan.price(subscriber.getPlanPriceId()).getInterval());
+        return persist(subscriber, plan);
+    }
+
+    /** FR-04.3: a charge fell due unpaid. */
+    public SubscriberSummary markPastDue(UUID id) {
+        Subscriber subscriber = findOrThrow(id);
+        subscriber.markPastDue();
+        return persist(subscriber, planOf(subscriber));
+    }
+
     @Transactional(readOnly = true)
     public SubscriberSummary findById(UUID id) {
         Subscriber subscriber = findOrThrow(id);

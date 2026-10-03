@@ -1,0 +1,10 @@
+.screen { min-height: 100vh; display: flex; align-items: center; justify-content: center; padding: var(--rc-space-4); background: var(--rc-canvas); }
+.card {
+  width: 400px; max-width: 100%; background: var(--rc-surface); border: 1px solid var(--rc-separator);
+  border-radius: 20px; padding: var(--rc-space-6); display: flex; flex-direction: column; gap: var(--rc-space-5);
+}
+.brand { display: flex; align-items: center; gap: 10px; font-size: var(--rc-size-title); font-weight: 600; }
+.title { margin: 0; font-size: var(--rc-size-section); font-weight: 600; letter-spacing: var(--rc-track-section); }
+.text { margin: 4px 0 0; color: var(--rc-ink-2); font-size: var(--rc-size-support); }
+.form { display: flex; flex-direction: column; gap: var(--rc-space-4); }
+.submit { width: 100%; }

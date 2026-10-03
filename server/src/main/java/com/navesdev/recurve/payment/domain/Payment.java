@@ -126,14 +126,22 @@ public class Payment {
 
     /** FR-04.2, FR-04.5. A failed charge may still be paid late; a paid or refunded one may not be paid again. */
     public void confirm(Instant paidAt) {
+        requireConfirmable();
+        status = PaymentStatus.PAID;
+        this.paidAt = Objects.requireNonNull(paidAt, "paidAt is required");
+    }
+
+    /**
+     * Whether {@link #confirm} would be accepted, without confirming: so
+     * the gateway is never told of a payment this one would then refuse.
+     */
+    public void requireConfirmable() {
         if (status == PaymentStatus.PAID) {
             throw new PaymentAlreadyPaidException(id);
         }
         if (status == PaymentStatus.REFUNDED) {
             throw new PaymentNotPendingException(id, status);
         }
-        status = PaymentStatus.PAID;
-        this.paidAt = Objects.requireNonNull(paidAt, "paidAt is required");
     }
 
     /** FR-04.3: declined, or due and unpaid. */
@@ -146,10 +154,15 @@ public class Payment {
 
     /** FR-04.4, BR-08: only what was paid can be given back. */
     public void refund(Instant now) {
+        requireRefundable();
+        status = PaymentStatus.REFUNDED;
+        refundedAt = Objects.requireNonNull(now, "now is required");
+    }
+
+    /** Whether {@link #refund} would be accepted, without refunding (BR-08). */
+    public void requireRefundable() {
         if (status != PaymentStatus.PAID) {
             throw new PaymentNotRefundableException(id, status);
         }
-        status = PaymentStatus.REFUNDED;
-        refundedAt = Objects.requireNonNull(now, "now is required");
     }
 }

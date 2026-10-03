@@ -197,6 +197,39 @@ class PaymentTest {
         }
     }
 
+    @Nested
+    @DisplayName("Asking before acting: whether a payment may move, without moving it")
+    class Checks {
+
+        @Test
+        void aPendingOrFailedPaymentMayBeConfirmed() {
+            Payment payment = pending();
+            payment.requireConfirmable();
+            payment.fail();
+            payment.requireConfirmable();
+
+            assertThat(payment.getStatus()).isEqualTo(PaymentStatus.FAILED);
+        }
+
+        @Test
+        void aPaidPaymentMayNotBeConfirmedAgain() {
+            Payment payment = pending();
+            payment.confirm(NOW);
+
+            assertThatThrownBy(payment::requireConfirmable).isInstanceOf(PaymentAlreadyPaidException.class);
+        }
+
+        @Test
+        void onlyAPaidPaymentMayBeRefunded() {
+            Payment payment = pending();
+
+            assertThatThrownBy(payment::requireRefundable).isInstanceOf(PaymentNotRefundableException.class);
+            payment.confirm(NOW);
+            payment.requireRefundable();
+            assertThat(payment.getStatus()).isEqualTo(PaymentStatus.PAID);
+        }
+    }
+
     private static Payment pending() {
         PlanPrice price = price("49.90");
         return Payment.charge(subscriber(price), price, NOW);

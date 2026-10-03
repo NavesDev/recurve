@@ -4,6 +4,7 @@ import java.time.Clock;
 import java.util.List;
 
 import org.springframework.dao.DataAccessResourceFailureException;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.dao.OptimisticLockingFailureException;
 import org.springframework.data.elasticsearch.UncategorizedElasticsearchException;
 import org.springframework.http.HttpStatus;
@@ -57,6 +58,17 @@ public class GlobalExceptionHandler {
     @ExceptionHandler(OptimisticLockingFailureException.class)
     public ResponseEntity<ApiError> handleConflict(OptimisticLockingFailureException e) {
         return respond(HttpStatus.CONFLICT, "The resource was changed by another request; reload it and try again");
+    }
+
+    /**
+     * The schema refused a write the service had already checked — a
+     * unique email (BR-02) taken by a request that raced this one past the
+     * check. Nothing was written. The message is fixed: the exception
+     * names tables and constraints.
+     */
+    @ExceptionHandler(DataIntegrityViolationException.class)
+    public ResponseEntity<ApiError> handleIntegrityConflict(DataIntegrityViolationException e) {
+        return respond(HttpStatus.CONFLICT, "The request conflicts with the current state of the data; reload it and try again");
     }
 
     /** No, wrong or refused credentials (BR-09); the message never says which. */

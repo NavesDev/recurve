@@ -17,6 +17,7 @@ tags:
   - name: Users
   - name: Plans
   - name: Prices
+  - name: Subscribers
 
 security:
   - basicAuth: []
@@ -55,6 +56,8 @@ paths:
           $ref: '#/components/responses/Unauthorized'
         '403':
           $ref: '#/components/responses/Forbidden'
+        '409':
+          $ref: '#/components/responses/Conflict'
         '422':
           $ref: '#/components/responses/UnprocessableEntity'
         '503':
@@ -155,6 +158,8 @@ paths:
           $ref: '#/components/responses/Forbidden'
         '404':
           $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
         '422':
           $ref: '#/components/responses/UnprocessableEntity'
         '503':
@@ -557,6 +562,213 @@ paths:
         '503':
           $ref: '#/components/responses/ServiceUnavailable'
 
+  /api/subscribers:
+
+    post:
+      tags: [Subscribers]
+      operationId: createSubscriber
+      summary: Register a subscriber on a price
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateSubscriberRequest'
+      responses:
+        '201':
+          description: Created
+          headers:
+            Location:
+              schema:
+                type: string
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SubscriberResponse'
+              examples:
+                subscriber:
+                  $ref: '#/components/examples/subscriber'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
+        '422':
+          $ref: '#/components/responses/UnprocessableEntity'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
+
+    get:
+      tags: [Subscribers]
+      operationId: searchSubscribers
+      summary: List subscribers
+      parameters:
+        - $ref: '#/components/parameters/q'
+        - $ref: '#/components/parameters/filter'
+        - $ref: '#/components/parameters/page'
+        - $ref: '#/components/parameters/size'
+        - $ref: '#/components/parameters/sort'
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SubscriberPage'
+              example:
+                items:
+                  - id: 5e4d3c2b-1a09-4f8e-9d7c-6b5a4f3e2d1c
+                    name: Grace Hopper
+                    email: grace@navy.mil
+                    status: ACTIVE
+                    planId: 3f2a1b0c-9d8e-4f7a-8b6c-5d4e3f2a1b0c
+                    planPriceId: 7c6b5a49-3827-4615-9e0d-1c2b3a4f5e6d
+                    price: 49.90
+                    currency: BRL
+                    interval: MONTHLY
+                    startedAt: '2026-01-15T10:00:00Z'
+                    nextBillingAt: '2026-02-15T10:00:00Z'
+                    createdAt: '2026-01-15T10:00:00Z'
+                page: 0
+                size: 20
+                total: 1
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '502':
+          $ref: '#/components/responses/BadGateway'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
+
+  /api/subscribers/{id}:
+
+    parameters:
+      - $ref: '#/components/parameters/subscriberId'
+
+    get:
+      tags: [Subscribers]
+      operationId: findSubscriber
+      summary: Get a subscriber
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SubscriberResponse'
+              examples:
+                subscriber:
+                  $ref: '#/components/examples/subscriber'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
+
+    put:
+      tags: [Subscribers]
+      operationId: updateSubscriber
+      summary: Update a subscriber's name and email
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateSubscriberRequest'
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SubscriberResponse'
+              examples:
+                subscriber:
+                  $ref: '#/components/examples/subscriber'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
+        '422':
+          $ref: '#/components/responses/UnprocessableEntity'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
+
+    delete:
+      tags: [Subscribers]
+      operationId: cancelSubscriber
+      summary: Cancel a subscriber
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SubscriberResponse'
+              example:
+                id: 5e4d3c2b-1a09-4f8e-9d7c-6b5a4f3e2d1c
+                name: Grace Hopper
+                email: grace@navy.mil
+                status: CANCELED
+                planId: 3f2a1b0c-9d8e-4f7a-8b6c-5d4e3f2a1b0c
+                planPriceId: 7c6b5a49-3827-4615-9e0d-1c2b3a4f5e6d
+                price: 49.90
+                currency: BRL
+                interval: MONTHLY
+                startedAt: '2026-01-15T10:00:00Z'
+                nextBillingAt: '2026-02-15T10:00:00Z'
+                canceledAt: '2026-02-01T09:00:00Z'
+                createdAt: '2026-01-15T10:00:00Z'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '422':
+          $ref: '#/components/responses/UnprocessableEntity'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
+
+  /api/subscribers/reindex:
+
+    post:
+      tags: [Subscribers]
+      operationId: reindexSubscribers
+      summary: Rebuild the subscriber search index
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ReindexResponse'
+              example:
+                indexed: 240
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
+
 components:
 
   securitySchemes:
@@ -583,6 +795,14 @@ components:
         format: uuid
 
     priceId:
+      name: id
+      in: path
+      required: true
+      schema:
+        type: string
+        format: uuid
+
+    subscriberId:
       name: id
       in: path
       required: true
@@ -903,6 +1123,103 @@ components:
           format: int64
           minimum: 0
 
+    SubscriberStatus:
+      type: string
+      enum:
+        - ACTIVE
+        - PAST_DUE
+        - CANCELED
+
+    CreateSubscriberRequest:
+      type: object
+      required: [name, email, planPriceId]
+      properties:
+        name:
+          type: string
+          minLength: 1
+          maxLength: 120
+        email:
+          type: string
+          format: email
+          maxLength: 255
+        planPriceId:
+          type: string
+          format: uuid
+
+    UpdateSubscriberRequest:
+      type: object
+      required: [name, email]
+      properties:
+        name:
+          type: string
+          minLength: 1
+          maxLength: 120
+        email:
+          type: string
+          format: email
+          maxLength: 255
+
+    SubscriberResponse:
+      type: object
+      required: [id, name, email, status, planId, planPriceId, price, currency, interval, startedAt, nextBillingAt, createdAt]
+      properties:
+        id:
+          type: string
+          format: uuid
+        name:
+          type: string
+        email:
+          type: string
+        status:
+          $ref: '#/components/schemas/SubscriberStatus'
+        planId:
+          type: string
+          format: uuid
+        planPriceId:
+          type: string
+          format: uuid
+        price:
+          type: number
+          minimum: 0.01
+          maximum: 9999999999.99
+        currency:
+          type: string
+          pattern: '^[A-Z]{3}$'
+        interval:
+          $ref: '#/components/schemas/BillingInterval'
+        startedAt:
+          type: string
+          format: date-time
+        nextBillingAt:
+          type: string
+          format: date-time
+        canceledAt:
+          type: string
+          format: date-time
+          nullable: true
+        createdAt:
+          type: string
+          format: date-time
+
+    SubscriberPage:
+      type: object
+      required: [items, page, size, total]
+      properties:
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/SubscriberResponse'
+        page:
+          type: integer
+          minimum: 0
+        size:
+          type: integer
+          minimum: 1
+        total:
+          type: integer
+          format: int64
+          minimum: 0
+
     ReindexResponse:
       type: object
       required: [indexed]
@@ -964,3 +1281,18 @@ components:
             interval: MONTHLY
             active: true
             createdAt: '2026-01-15T10:00:00Z'
+
+    subscriber:
+      value:
+        id: 5e4d3c2b-1a09-4f8e-9d7c-6b5a4f3e2d1c
+        name: Grace Hopper
+        email: grace@navy.mil
+        status: ACTIVE
+        planId: 3f2a1b0c-9d8e-4f7a-8b6c-5d4e3f2a1b0c
+        planPriceId: 7c6b5a49-3827-4615-9e0d-1c2b3a4f5e6d
+        price: 49.90
+        currency: BRL
+        interval: MONTHLY
+        startedAt: '2026-01-15T10:00:00Z'
+        nextBillingAt: '2026-02-15T10:00:00Z'
+        createdAt: '2026-01-15T10:00:00Z'

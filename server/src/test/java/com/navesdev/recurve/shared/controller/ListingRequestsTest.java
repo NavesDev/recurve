@@ -71,6 +71,14 @@ class ListingRequestsTest {
         }
 
         @Test
+        void aFeatureDefaultMayNameItsDirectionTheWayACallerWould() {
+            // FR-06.3: subscribers list newest first.
+            Sort sort = listings.parse(null, null, 0, 20, null, "startedAt:desc").pageable().getSort();
+
+            assertThat(sort).containsExactly(Sort.Order.desc("startedAt"), Sort.Order.asc("id"));
+        }
+
+        @Test
         void theFieldIsPassedThroughAsNamedWithItsDirection() {
             // No translation and no allow-list: the contract names the
             // index's own fields, and the mapping says which ones sort.

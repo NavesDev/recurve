@@ -44,8 +44,8 @@ public class ListingRequests {
      * @param filters the raw values of {@code filter}, straight off the
      *        request ({@code null} when absent); Spring must not bind them,
      *        or it splits on the comma that separates a criterion's values
-     * @param defaultSort the field the feature lists by when {@code sort}
-     *        is absent, named as its index names it
+     * @param defaultSort the key the feature lists by when {@code sort}
+     *        is absent, spelled as {@code sort} is
      */
     public ListingRequest parse(String q, String[] filters, int page, int size, String sort, String defaultSort) {
         SearchFilter filter = new SearchFilter(q,

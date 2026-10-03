@@ -21,6 +21,10 @@ import java.lang.annotation.Target;
 @Retention(RetentionPolicy.RUNTIME)
 public @interface Listing {
 
-    /** The field the feature lists by when {@code sort} is absent, named as its index names it. */
+    /**
+     * The key the feature lists by when {@code sort} is absent, named as its
+     * index names it and spelled as {@code sort} is: ascending unless it
+     * says {@code :desc}.
+     */
     String defaultSort();
 }

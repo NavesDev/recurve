@@ -148,6 +148,20 @@ public class Plan {
         return target;
     }
 
+    /**
+     * FR-02.3, FR-02.4: the price a new subscriber may take — one in force,
+     * on a plan still on sale. Subscribers already on a price keep it
+     * whatever happens to either.
+     */
+    public PlanPrice subscribablePrice(UUID priceId) {
+        requireActive();
+        PlanPrice target = price(priceId);
+        if (!target.isActive()) {
+            throw new PriceInactiveException(priceId);
+        }
+        return target;
+    }
+
     public PlanPrice price(UUID priceId) {
         return prices.stream()
                 .filter(candidate -> candidate.getId().equals(priceId))

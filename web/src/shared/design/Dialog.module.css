@@ -1,0 +1,13 @@
+.backdrop {
+  position: fixed; inset: 0; z-index: 100; display: flex; align-items: center; justify-content: center;
+  padding: var(--rc-space-4); background: rgba(28, 28, 30, 0.32);
+}
+.dialog {
+  width: 480px; max-width: 100%; max-height: calc(100vh - 32px); overflow: auto;
+  background: var(--rc-surface); border-radius: 16px; box-shadow: var(--rc-shadow-dialog);
+  padding: var(--rc-space-6); display: flex; flex-direction: column; gap: var(--rc-space-5);
+  animation: rc-rise 200ms ease both;
+}
+.title { margin: 0; font-size: var(--rc-size-section); font-weight: 600; letter-spacing: var(--rc-track-section); }
+.body { font-size: var(--rc-size-body); color: var(--rc-ink-2); display: flex; flex-direction: column; gap: var(--rc-space-4); }
+.actions { display: flex; justify-content: flex-end; gap: 10px; flex-wrap: wrap; }

@@ -1,0 +1,10 @@
+.region { position: fixed; right: var(--rc-space-5); bottom: var(--rc-space-5); z-index: 200; display: flex; flex-direction: column; gap: 10px; max-width: min(420px, calc(100vw - 32px)); }
+.toast {
+  display: flex; align-items: flex-start; gap: 10px; padding: 12px 16px; border-radius: var(--rc-radius-field);
+  font-size: 14px; box-shadow: 0 10px 30px rgba(0, 0, 0, 0.14); animation: rc-rise 200ms ease both;
+}
+.success { background: var(--rc-success-soft); color: var(--rc-success-ink); }
+.error { background: var(--rc-danger-soft); color: var(--rc-danger-ink); }
+.message { flex: 1; }
+.close { border: none; background: none; cursor: pointer; color: inherit; font-size: 16px; line-height: 1; padding: 0; }
+.surface { background: var(--rc-surface); border-radius: var(--rc-radius-field); }

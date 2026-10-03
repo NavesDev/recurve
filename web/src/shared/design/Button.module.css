@@ -1,0 +1,21 @@
+.button {
+  display: inline-flex; align-items: center; justify-content: center; gap: var(--rc-space-2);
+  min-height: var(--rc-hit-min); padding: 9px 18px; border-radius: var(--rc-radius-field);
+  font-size: 14px; font-weight: 600; cursor: pointer; white-space: nowrap;
+  transition: background 120ms ease;
+}
+.button:disabled { cursor: not-allowed; color: var(--rc-ink-disabled); background: var(--rc-fill); border: none; }
+.button[aria-busy='true'] { cursor: progress; }
+.primary { color: var(--rc-on-color); background: var(--rc-action); border: none; }
+.primary:hover:not(:disabled) { background: var(--rc-action-hover); }
+.secondary { color: var(--rc-ink); background: var(--rc-surface); border: 1px solid var(--rc-border-field); }
+.secondary:hover:not(:disabled) { background: var(--rc-fill); }
+.danger { color: var(--rc-danger-ink); background: var(--rc-surface); border: 1px solid var(--rc-danger); }
+.danger:hover:not(:disabled) { background: var(--rc-danger-soft); }
+.quiet { color: var(--rc-action); background: transparent; border: none; }
+.quiet:hover:not(:disabled) { background: var(--rc-action-soft); }
+.small { min-height: 30px; padding: 5px 12px; font-size: 13px; }
+.spinner {
+  width: 14px; height: 14px; border-radius: 50%;
+  border: 2px solid currentColor; border-right-color: transparent; animation: rc-spin 700ms linear infinite;
+}

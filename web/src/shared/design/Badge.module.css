@@ -1,0 +1,9 @@
+.badge {
+  display: inline-flex; align-items: center; font-size: var(--rc-size-label); font-weight: 600;
+  padding: 5px 12px; border-radius: var(--rc-radius-pill); white-space: nowrap;
+}
+.action { color: var(--rc-action-ink); background: var(--rc-action-soft); }
+.success { color: var(--rc-success-ink); background: var(--rc-success-soft); }
+.warn { color: var(--rc-warn-ink); background: var(--rc-warn-soft); }
+.danger { color: var(--rc-danger-ink); background: var(--rc-danger-soft); }
+.neutral { color: var(--rc-ink-2); background: var(--rc-neutral-soft); }

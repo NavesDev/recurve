@@ -1,0 +1,74 @@
+/* Recurve design tokens, verbatim from the prototype (recurve-tokens.css).
+   The single source of every color, size and space in the panel. */
+
+:root {
+  /* Tipografia */
+  --rc-font: "Poppins", -apple-system, BlinkMacSystemFont, "Helvetica Neue", Helvetica, sans-serif;
+  --rc-mono: ui-monospace, "SF Mono", Menlo, monospace;
+
+  --rc-size-display: 40px;
+  --rc-size-metric: 34px;
+  --rc-size-section: 22px;
+  --rc-size-title: 16px;
+  --rc-size-body: 15px;
+  --rc-size-support: 13px;
+  --rc-size-label: 12px;
+
+  --rc-track-display: -0.026em;
+  --rc-track-section: -0.018em;
+  --rc-track-label: 0.06em;
+
+  /* Cor — superfícies e tinta */
+  --rc-canvas: #f5f5f7;
+  --rc-surface: #ffffff;
+  --rc-surface-sunken: #fafafb;
+  --rc-fill: #f0f0f2;
+  --rc-separator: #e5e5e7;
+  --rc-border-field: #d8d8dc;
+  --rc-ink: #1c1c1e;
+  --rc-ink-2: #6e6e73;
+  --rc-ink-3: #8e8e93;
+  --rc-ink-disabled: #aeaeb2;
+  --rc-on-color: #ffffff;
+
+  /* Cor — semântica */
+  --rc-action: oklch(0.55 0.13 255);
+  --rc-action-hover: oklch(0.48 0.13 255);
+  --rc-action-soft: oklch(0.55 0.13 255 / 0.13);
+  --rc-action-ring: oklch(0.55 0.13 255 / 0.18);
+  --rc-action-ink: oklch(0.42 0.12 255);
+
+  --rc-success: oklch(0.60 0.13 150);
+  --rc-success-soft: oklch(0.60 0.13 150 / 0.14);
+  --rc-success-ink: oklch(0.42 0.12 150);
+
+  --rc-warn: oklch(0.72 0.13 75);
+  --rc-warn-soft: oklch(0.72 0.13 75 / 0.20);
+  --rc-warn-ink: oklch(0.45 0.12 75);
+
+  --rc-danger: oklch(0.55 0.16 25);
+  --rc-danger-soft: oklch(0.55 0.16 25 / 0.10);
+  --rc-danger-ink: oklch(0.48 0.16 25);
+
+  --rc-neutral-soft: #eeeef0;
+
+  /* Métrica — base 4 */
+  --rc-space-1: 4px;
+  --rc-space-2: 8px;
+  --rc-space-3: 12px;
+  --rc-space-4: 16px;
+  --rc-space-5: 22px;
+  --rc-space-6: 32px;
+  --rc-space-7: 56px;
+
+  --rc-radius-field: 8px;
+  --rc-radius-card: 14px;
+  --rc-radius-pill: 999px;
+
+  --rc-shadow-card: 0 1px 2px rgba(0, 0, 0, 0.05);
+  --rc-shadow-dialog: 0 24px 60px rgba(0, 0, 0, 0.18);
+
+  --rc-sidebar-width: 236px;
+  --rc-hit-min: 36px;
+  --rc-icon-stroke: 1.6;
+}

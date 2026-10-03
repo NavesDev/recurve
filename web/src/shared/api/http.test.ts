@@ -12,13 +12,13 @@ function json(status: number, body: unknown) {
 describe('http client', () => {
   let session: SessionStore;
   let fetchMock: ReturnType<typeof vi.fn<typeof fetch>>;
-  let onForbidden: ReturnType<typeof vi.fn>;
+  let onForbidden: ReturnType<typeof vi.fn<() => void>>;
 
   beforeEach(() => {
     sessionStorage.clear();
     session = createSessionStore(() => NOW);
     fetchMock = vi.fn<typeof fetch>();
-    onForbidden = vi.fn();
+    onForbidden = vi.fn<() => void>();
   });
 
   const client = () => createHttp({ fetch: fetchMock, session, onForbidden });

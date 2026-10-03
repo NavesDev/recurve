@@ -1,0 +1,12 @@
+.bar { display: flex; align-items: center; justify-content: space-between; gap: var(--rc-space-4); flex-wrap: wrap; }
+.range { font-size: var(--rc-size-support); color: var(--rc-ink-2); }
+.controls { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+.sizes { display: flex; align-items: center; gap: 8px; border: none; margin: 0; padding: 0; }
+.legend { float: left; font-size: var(--rc-size-support); color: var(--rc-ink-2); margin-right: 8px; padding: 0; }
+.track { display: flex; gap: 4px; padding: 3px; background: var(--rc-fill); border-radius: 8px; }
+.size { position: relative; }
+.size input { position: absolute; inset: 0; opacity: 0; margin: 0; cursor: pointer; }
+.size span { display: block; padding: 4px 10px; border-radius: 6px; font-family: var(--rc-mono); font-size: 12px; font-weight: 600; color: var(--rc-ink-2); }
+.size input:checked + span { background: var(--rc-surface); color: var(--rc-ink); box-shadow: 0 1px 2px rgba(0, 0, 0, 0.1); }
+.size input:focus-visible + span { box-shadow: 0 0 0 3px var(--rc-action-ring); }
+.pageLabel { font-family: var(--rc-mono); font-size: 12px; color: var(--rc-ink-3); }

@@ -14,13 +14,18 @@ export default tseslint.config(
     plugins: { 'react-hooks': reactHooks, architecture },
     rules: {
       ...reactHooks.configs.recommended.rules,
-      'architecture/feature-boundaries': 'error',
-      'architecture/no-literal-permission': 'error',
-      'architecture/no-literal-path': 'error',
       // Relative imports only: the boundary rule reads them.
       'no-restricted-imports': ['error', { patterns: [{ group: ['@/*', 'src/*'], message: 'Use a relative import.' }] }],
       eqeqeq: ['error', 'always'],
       'no-console': ['error', { allow: ['warn', 'error'] }],
+    },
+  },
+  {
+    files: ['src/**/*.{ts,tsx}'],
+    rules: {
+      'architecture/feature-boundaries': 'error',
+      'architecture/no-literal-permission': 'error',
+      'architecture/no-literal-path': 'error',
     },
   },
   {

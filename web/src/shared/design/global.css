@@ -1,0 +1,33 @@
+@import url('https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600&display=swap');
+
+*, *::before, *::after { box-sizing: border-box; }
+
+body {
+  margin: 0;
+  background: var(--rc-canvas);
+  color: var(--rc-ink);
+  font-family: var(--rc-font);
+  font-size: var(--rc-size-body);
+  -webkit-font-smoothing: antialiased;
+}
+
+a { color: var(--rc-action); text-decoration: none; }
+a:hover { color: var(--rc-action-hover); }
+
+input, select, textarea, button { font-family: inherit; font-size: inherit; }
+input::placeholder, textarea::placeholder { color: var(--rc-ink-disabled); }
+
+:focus-visible { outline: none; box-shadow: 0 0 0 3px var(--rc-action-ring); }
+
+.visually-hidden {
+  position: absolute; width: 1px; height: 1px; overflow: hidden;
+  clip: rect(0 0 0 0); white-space: nowrap;
+}
+
+@keyframes rc-rise { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: none; } }
+@keyframes rc-spin { to { transform: rotate(360deg); } }
+@keyframes rc-pulse { 50% { opacity: 0.45; } }
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { animation-duration: 0.01ms !important; transition-duration: 0.01ms !important; }
+}

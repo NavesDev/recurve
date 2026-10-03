@@ -1,0 +1,19 @@
+.wrapper { position: relative; display: inline-flex; }
+.trigger {
+  width: 32px; height: 32px; border: none; border-radius: var(--rc-radius-field); background: transparent;
+  display: inline-flex; align-items: center; justify-content: center; color: var(--rc-ink-2); cursor: pointer;
+}
+.trigger:hover { background: var(--rc-fill); }
+.menu {
+  position: absolute; top: calc(100% + 6px); right: 0; z-index: 60; min-width: 210px;
+  background: var(--rc-surface); border: 1px solid var(--rc-separator); border-radius: 10px;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.14); padding: 5px; display: flex; flex-direction: column;
+  animation: rc-rise 120ms ease both;
+}
+.heading { padding: 7px 9px; font-size: var(--rc-size-label); font-weight: 600; color: var(--rc-ink-3); }
+.item {
+  text-align: left; border: none; background: transparent; cursor: pointer; padding: 8px 9px;
+  border-radius: 6px; font-size: 14px; color: var(--rc-ink);
+}
+.item:hover, .item:focus-visible { background: var(--rc-fill); box-shadow: none; }
+.danger { color: var(--rc-danger-ink); }

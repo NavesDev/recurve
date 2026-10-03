@@ -38,7 +38,7 @@ src/
   shared/
     api/               http client, ApiError, listing (q/filter/sort/page ↔ URL)
     constants/         what two or more features use, one file per subject
-    design/            tokens.css, global.css, one folder per component
+    design/            tokens.css, global.css, Component.tsx + Component.module.css
     format/            money, dates, documents
     layout/            AppShell, Sidebar, Topbar
   auth/                sign-in, session, me, useCan, <Can>, <RequireAuth>

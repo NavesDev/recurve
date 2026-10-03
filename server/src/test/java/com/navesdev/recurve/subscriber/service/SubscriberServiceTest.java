@@ -89,7 +89,7 @@ class SubscriberServiceTest {
             when(planService.findForSubscription(price.getId())).thenReturn(plan);
             savesWhatItIsGiven();
 
-            SubscriberSummary created = service.create(new CreateSubscriberCommand("Grace", "grace@navy.mil", price.getId()));
+            SubscriberSummary created = service.create(new CreateSubscriberCommand("Grace", "grace@navy.mil", "529.982.247-25", price.getId()));
 
             assertThat(created.startedAt()).isEqualTo(NOW);
             assertThat(created.planId()).isEqualTo(plan.getId());
@@ -102,7 +102,7 @@ class SubscriberServiceTest {
         void theEmailIsCheckedInItsCanonicalForm() {
             when(repository.existsByEmail("grace@navy.mil")).thenReturn(true);
 
-            assertThatThrownBy(() -> service.create(new CreateSubscriberCommand("Grace", " Grace@Navy.Mil ", price.getId())))
+            assertThatThrownBy(() -> service.create(new CreateSubscriberCommand("Grace", " Grace@Navy.Mil ", "529.982.247-25", price.getId())))
                     .isInstanceOf(SubscriberEmailAlreadyInUseException.class);
 
             verify(repository, never()).save(any());
@@ -113,7 +113,7 @@ class SubscriberServiceTest {
         void aPriceNotOnSaleSavesNothing() {
             when(planService.findForSubscription(price.getId())).thenThrow(new PriceInactiveException(price.getId()));
 
-            assertThatThrownBy(() -> service.create(new CreateSubscriberCommand("Grace", "grace@navy.mil", price.getId())))
+            assertThatThrownBy(() -> service.create(new CreateSubscriberCommand("Grace", "grace@navy.mil", "529.982.247-25", price.getId())))
                     .isInstanceOf(PriceInactiveException.class);
 
             verify(repository, never()).save(any());
@@ -132,7 +132,7 @@ class SubscriberServiceTest {
             savesWhatItIsGiven();
 
             SubscriberSummary updated = service.update(
-                    new UpdateSubscriberCommand(subscriber.getId(), "Grace B. Hopper", "gbh@navy.mil"));
+                    new UpdateSubscriberCommand(subscriber.getId(), "Grace B. Hopper", "gbh@navy.mil", "52998224725"));
 
             assertThat(updated.name()).isEqualTo("Grace B. Hopper");
             verify(repository).save(subscriber);
@@ -145,7 +145,7 @@ class SubscriberServiceTest {
             knowsThePlan();
             savesWhatItIsGiven();
 
-            service.update(new UpdateSubscriberCommand(subscriber.getId(), "Grace B. Hopper", " GRACE@navy.mil"));
+            service.update(new UpdateSubscriberCommand(subscriber.getId(), "Grace B. Hopper", " GRACE@navy.mil", "52998224725"));
 
             verify(repository, never()).existsByEmailAndIdNot(any(), any());
         }
@@ -156,7 +156,7 @@ class SubscriberServiceTest {
             when(repository.existsByEmailAndIdNot("ada@engine.org", subscriber.getId())).thenReturn(true);
 
             assertThatThrownBy(() -> service.update(
-                    new UpdateSubscriberCommand(subscriber.getId(), "Grace", "Ada@Engine.org")))
+                    new UpdateSubscriberCommand(subscriber.getId(), "Grace", "Ada@Engine.org", "52998224725")))
                     .isInstanceOf(SubscriberEmailAlreadyInUseException.class);
 
             verify(repository, never()).save(any());
@@ -205,7 +205,7 @@ class SubscriberServiceTest {
 
             assertThatThrownBy(() -> service.findById(unknown)).isInstanceOf(SubscriberNotFoundException.class);
             assertThatThrownBy(() -> service.cancel(unknown)).isInstanceOf(SubscriberNotFoundException.class);
-            assertThatThrownBy(() -> service.update(new UpdateSubscriberCommand(unknown, "Grace", "grace@navy.mil")))
+            assertThatThrownBy(() -> service.update(new UpdateSubscriberCommand(unknown, "Grace", "grace@navy.mil", "52998224725")))
                     .isInstanceOf(SubscriberNotFoundException.class);
         }
 
@@ -244,7 +244,7 @@ class SubscriberServiceTest {
             savesWhatItIsGiven();
             doThrow(new DataAccessResourceFailureException("search is down")).when(searchRepository).save(any());
 
-            assertThatThrownBy(() -> service.create(new CreateSubscriberCommand("Grace", "grace@navy.mil", price.getId())))
+            assertThatThrownBy(() -> service.create(new CreateSubscriberCommand("Grace", "grace@navy.mil", "529.982.247-25", price.getId())))
                     .isInstanceOf(DataAccessResourceFailureException.class);
         }
     }
@@ -255,8 +255,8 @@ class SubscriberServiceTest {
 
         @Test
         void theIndexIsRecreatedAndEverySubscriberIndexedWithItsPlan() {
-            Subscriber grace = Subscriber.start("Grace", "grace@navy.mil", price, EARLIER);
-            Subscriber ada = Subscriber.start("Ada", "ada@engine.org", price, EARLIER);
+            Subscriber grace = Subscriber.start("Grace", "grace@navy.mil", "52998224725", price, EARLIER);
+            Subscriber ada = Subscriber.start("Ada", "ada@engine.org", "52998224725", price, EARLIER);
             when(repository.streamAll()).thenReturn(Stream.of(grace, ada));
             when(planService.findByPriceIds(Set.of(price.getId()))).thenReturn(Map.of(price.getId(), plan));
 
@@ -278,7 +278,7 @@ class SubscriberServiceTest {
     }
 
     private Subscriber stored() {
-        Subscriber subscriber = Subscriber.start("Grace", "grace@navy.mil", price, EARLIER);
+        Subscriber subscriber = Subscriber.start("Grace", "grace@navy.mil", "52998224725", price, EARLIER);
         when(repository.findById(subscriber.getId())).thenReturn(Optional.of(subscriber));
         return subscriber;
     }

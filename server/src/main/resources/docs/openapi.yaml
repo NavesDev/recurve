@@ -625,6 +625,7 @@ paths:
                   - id: 5e4d3c2b-1a09-4f8e-9d7c-6b5a4f3e2d1c
                     name: Grace Hopper
                     email: grace@navy.mil
+                    document: '52998224725'
                     status: ACTIVE
                     planId: 3f2a1b0c-9d8e-4f7a-8b6c-5d4e3f2a1b0c
                     planPriceId: 7c6b5a49-3827-4615-9e0d-1c2b3a4f5e6d
@@ -726,6 +727,7 @@ paths:
                 id: 5e4d3c2b-1a09-4f8e-9d7c-6b5a4f3e2d1c
                 name: Grace Hopper
                 email: grace@navy.mil
+                document: '52998224725'
                 status: CANCELED
                 planId: 3f2a1b0c-9d8e-4f7a-8b6c-5d4e3f2a1b0c
                 planPriceId: 7c6b5a49-3827-4615-9e0d-1c2b3a4f5e6d
@@ -1132,7 +1134,7 @@ components:
 
     CreateSubscriberRequest:
       type: object
-      required: [name, email, planPriceId]
+      required: [name, email, document, planPriceId]
       properties:
         name:
           type: string
@@ -1142,13 +1144,17 @@ components:
           type: string
           format: email
           maxLength: 255
+        document:
+          type: string
+          description: CPF or CNPJ, with or without punctuation
+          maxLength: 18
         planPriceId:
           type: string
           format: uuid
 
     UpdateSubscriberRequest:
       type: object
-      required: [name, email]
+      required: [name, email, document]
       properties:
         name:
           type: string
@@ -1158,6 +1164,10 @@ components:
           type: string
           format: email
           maxLength: 255
+        document:
+          type: string
+          description: CPF or CNPJ, with or without punctuation
+          maxLength: 18
 
     SubscriberResponse:
       type: object
@@ -1170,6 +1180,11 @@ components:
           type: string
         email:
           type: string
+        document:
+          type: string
+          nullable: true
+          description: CPF or CNPJ, digits only; absent for subscribers registered before it was required
+          pattern: '^([0-9]{11}|[0-9]{14})$'
         status:
           $ref: '#/components/schemas/SubscriberStatus'
         planId:
@@ -1287,6 +1302,7 @@ components:
         id: 5e4d3c2b-1a09-4f8e-9d7c-6b5a4f3e2d1c
         name: Grace Hopper
         email: grace@navy.mil
+        document: '52998224725'
         status: ACTIVE
         planId: 3f2a1b0c-9d8e-4f7a-8b6c-5d4e3f2a1b0c
         planPriceId: 7c6b5a49-3827-4615-9e0d-1c2b3a4f5e6d

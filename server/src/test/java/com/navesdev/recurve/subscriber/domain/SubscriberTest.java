@@ -22,6 +22,7 @@ class SubscriberTest {
 
     private static final Instant NOW = Instant.parse("2026-01-31T10:00:00Z");
     private static final Instant LATER = Instant.parse("2026-02-10T09:00:00Z");
+    private static final String DOCUMENT = "52998224725";
 
     @Nested
     @DisplayName("FR-03.1, FR-03.2 registering a subscriber")
@@ -60,10 +61,27 @@ class SubscriberTest {
 
         @Test
         void theEmailIsKeptInItsCanonicalForm() {
-            Subscriber subscriber = Subscriber.start(" Grace ", " Grace@Navy.Mil ", price(BillingInterval.MONTHLY), NOW);
+            Subscriber subscriber = Subscriber.start(" Grace ", " Grace@Navy.Mil ", "52998224725", price(BillingInterval.MONTHLY), NOW);
 
             assertThat(subscriber.getName()).isEqualTo("Grace");
             assertThat(subscriber.getEmail()).isEqualTo("grace@navy.mil");
+        }
+
+        @Test
+        void theDocumentIsKeptAsItsDigits() {
+            Subscriber subscriber = Subscriber.start("Grace", "grace@navy.mil", "529.982.247-25",
+                    price(BillingInterval.MONTHLY), NOW);
+
+            assertThat(subscriber.getDocument()).isEqualTo(DOCUMENT);
+            assertThat(subscriber.getGatewayCustomerId()).isNull();
+        }
+
+        @Test
+        void aSubscriberWithoutAValidDocumentCannotBeRegistered() {
+            PlanPrice price = price(BillingInterval.MONTHLY);
+
+            assertThatThrownBy(() -> Subscriber.start("Grace", "grace@navy.mil", "529.982.247-24", price, NOW))
+                    .isInstanceOf(InvalidSubscriberException.class);
         }
 
         @Test
@@ -71,9 +89,9 @@ class SubscriberTest {
             // The rules are SubscriberValidator's; this shows the entity goes through them.
             PlanPrice price = price(BillingInterval.MONTHLY);
 
-            assertThatThrownBy(() -> Subscriber.start(" ", "grace@navy.mil", price, NOW))
+            assertThatThrownBy(() -> Subscriber.start(" ", "grace@navy.mil", "52998224725", price, NOW))
                     .isInstanceOf(InvalidSubscriberException.class);
-            assertThatThrownBy(() -> Subscriber.start("Grace", "not-an-email", price, NOW))
+            assertThatThrownBy(() -> Subscriber.start("Grace", "not-an-email", "52998224725", price, NOW))
                     .isInstanceOf(InvalidSubscriberException.class);
         }
     }
@@ -86,17 +104,18 @@ class SubscriberTest {
         void theNameAndEmailChange() {
             Subscriber subscriber = start(price(BillingInterval.MONTHLY));
 
-            subscriber.update("Grace B. Hopper", "GBH@Navy.Mil");
+            subscriber.update("Grace B. Hopper", "GBH@Navy.Mil", "11.222.333/0001-81");
 
             assertThat(subscriber.getName()).isEqualTo("Grace B. Hopper");
             assertThat(subscriber.getEmail()).isEqualTo("gbh@navy.mil");
+            assertThat(subscriber.getDocument()).isEqualTo("11222333000181");
         }
 
         @Test
         void anInvalidEditChangesNothing() {
             Subscriber subscriber = start(price(BillingInterval.MONTHLY));
 
-            assertThatThrownBy(() -> subscriber.update("Grace B. Hopper", "not-an-email"))
+            assertThatThrownBy(() -> subscriber.update("Grace B. Hopper", "not-an-email", DOCUMENT))
                     .isInstanceOf(InvalidSubscriberException.class);
             assertThat(subscriber.getName()).isEqualTo("Grace");
         }
@@ -106,7 +125,7 @@ class SubscriberTest {
             Subscriber subscriber = start(price(BillingInterval.MONTHLY));
             subscriber.cancel(LATER);
 
-            assertThatThrownBy(() -> subscriber.update("Grace B. Hopper", "gbh@navy.mil"))
+            assertThatThrownBy(() -> subscriber.update("Grace B. Hopper", "gbh@navy.mil", DOCUMENT))
                     .isInstanceOf(SubscriberCanceledException.class);
         }
     }
@@ -136,8 +155,86 @@ class SubscriberTest {
         }
     }
 
+    @Nested
+    @DisplayName("Who the gateway charges")
+    class Billing {
+
+        @Test
+        void anActiveSubscriberWithADocumentIsBillable() {
+            assertThat(start(price(BillingInterval.MONTHLY)).isBillable()).isTrue();
+        }
+
+        @Test
+        void aCanceledSubscriberIsNot() {
+            // BR-07: a canceled subscriber generates no charge.
+            Subscriber subscriber = start(price(BillingInterval.MONTHLY));
+            subscriber.cancel(LATER);
+
+            assertThat(subscriber.isBillable()).isFalse();
+        }
+
+        @Test
+        void theGatewayCustomerIsAttachedOnce() {
+            Subscriber subscriber = start(price(BillingInterval.MONTHLY));
+
+            subscriber.attachGatewayCustomer("cus_000005219613");
+
+            assertThat(subscriber.getGatewayCustomerId()).isEqualTo("cus_000005219613");
+            assertThatThrownBy(() -> subscriber.attachGatewayCustomer("cus_other"))
+                    .isInstanceOf(IllegalStateException.class);
+        }
+    }
+
+    @Nested
+    @DisplayName("FR-04.2 / FR-04.3 what a payment does to a subscriber")
+    class Payments {
+
+        @Test
+        void aConfirmedPaymentMovesTheNextBillingDateOneCycle() {
+            Subscriber subscriber = start(price(BillingInterval.MONTHLY));
+
+            subscriber.confirmPayment(BillingInterval.MONTHLY);
+
+            // 31 Jan → 28 Feb → 28 Mar: BR-06, the date moves from where it was.
+            assertThat(subscriber.getNextBillingAt()).isEqualTo(Instant.parse("2026-03-28T10:00:00Z"));
+            assertThat(subscriber.getStatus()).isEqualTo(SubscriberStatus.ACTIVE);
+        }
+
+        @Test
+        void aConfirmedPaymentBringsAPastDueSubscriberBack() {
+            Subscriber subscriber = start(price(BillingInterval.MONTHLY));
+            subscriber.markPastDue();
+
+            subscriber.confirmPayment(BillingInterval.MONTHLY);
+
+            assertThat(subscriber.getStatus()).isEqualTo(SubscriberStatus.ACTIVE);
+        }
+
+        @Test
+        void aFailedPaymentLeavesTheSubscriberPastDue() {
+            Subscriber subscriber = start(price(BillingInterval.MONTHLY));
+
+            subscriber.markPastDue();
+
+            assertThat(subscriber.getStatus()).isEqualTo(SubscriberStatus.PAST_DUE);
+        }
+
+        @Test
+        void aCanceledSubscriberStaysCanceledWhateverItsPaymentsDo() {
+            Subscriber subscriber = start(price(BillingInterval.MONTHLY));
+            subscriber.cancel(LATER);
+            Instant nextBilling = subscriber.getNextBillingAt();
+
+            subscriber.confirmPayment(BillingInterval.MONTHLY);
+            subscriber.markPastDue();
+
+            assertThat(subscriber.getStatus()).isEqualTo(SubscriberStatus.CANCELED);
+            assertThat(subscriber.getNextBillingAt()).isEqualTo(nextBilling);
+        }
+    }
+
     private static Subscriber start(PlanPrice price) {
-        return Subscriber.start("Grace", "grace@navy.mil", price, NOW);
+        return Subscriber.start("Grace", "grace@navy.mil", "52998224725", price, NOW);
     }
 
     private static PlanPrice price(BillingInterval interval) {

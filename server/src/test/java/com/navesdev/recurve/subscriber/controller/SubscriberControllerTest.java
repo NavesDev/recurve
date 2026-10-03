@@ -94,12 +94,13 @@ class SubscriberControllerTest {
             when(service.create(sent.capture())).thenReturn(grace);
 
             mvc.perform(json(post("/api/subscribers"), """
-                    {"name":"Grace","email":"grace@navy.mil","planPriceId":"%s"}
+                    {"name":"Grace","email":"grace@navy.mil","document":"529.982.247-25","planPriceId":"%s"}
                     """.formatted(grace.planPriceId())))
                     .andExpect(status().isCreated())
                     .andExpect(header().string("Location", "/api/subscribers/" + grace.id()))
                     .andExpect(jsonPath("$.status").value("ACTIVE"))
                     .andExpect(jsonPath("$.planId").value(grace.planId().toString()))
+                    .andExpect(jsonPath("$.document").value("52998224725"))
                     .andExpect(jsonPath("$.interval").value("MONTHLY"))
                     .andExpect(jsonPath("$.canceledAt").doesNotExist())
                     .andExpect(content().string(containsString("\"price\":49.90")));
@@ -113,7 +114,7 @@ class SubscriberControllerTest {
                     {"name":"","email":"not-an-email"}
                     """))
                     .andExpect(status().isBadRequest())
-                    .andExpect(jsonPath("$.fieldErrors[*].field").value(containsInAnyOrder("name", "email", "planPriceId")));
+                    .andExpect(jsonPath("$.fieldErrors[*].field").value(containsInAnyOrder("name", "email", "document", "planPriceId")));
 
             verify(service, never()).create(any());
         }
@@ -124,7 +125,7 @@ class SubscriberControllerTest {
             when(service.create(any())).thenThrow(new PriceInactiveException(priceId));
 
             mvc.perform(json(post("/api/subscribers"), """
-                    {"name":"Grace","email":"grace@navy.mil","planPriceId":"%s"}
+                    {"name":"Grace","email":"grace@navy.mil","document":"529.982.247-25","planPriceId":"%s"}
                     """.formatted(priceId)))
                     .andExpect(status().isUnprocessableEntity());
         }
@@ -136,7 +137,7 @@ class SubscriberControllerTest {
             when(service.create(any())).thenThrow(new DataIntegrityViolationException("uq_subscribers_email"));
 
             mvc.perform(json(post("/api/subscribers"), """
-                    {"name":"Grace","email":"grace@navy.mil","planPriceId":"%s"}
+                    {"name":"Grace","email":"grace@navy.mil","document":"529.982.247-25","planPriceId":"%s"}
                     """.formatted(UUID.randomUUID())))
                     .andExpect(status().isConflict())
                     .andExpect(jsonPath("$.status").value(409))
@@ -155,12 +156,13 @@ class SubscriberControllerTest {
             when(service.update(sent.capture())).thenReturn(grace());
 
             mvc.perform(json(put("/api/subscribers/{id}", id), """
-                    {"name":"Grace B. Hopper","email":"gbh@navy.mil"}
+                    {"name":"Grace B. Hopper","email":"gbh@navy.mil","document":"11.222.333/0001-81"}
                     """))
                     .andExpect(status().isOk());
 
             assertThat(sent.getValue().id()).isEqualTo(id);
             assertThat(sent.getValue().email()).isEqualTo("gbh@navy.mil");
+            assertThat(sent.getValue().document()).isEqualTo("11.222.333/0001-81");
         }
 
         @Test
@@ -236,7 +238,7 @@ class SubscriberControllerTest {
     private static SubscriberSummary grace() {
         Plan plan = Plan.create("Pro", null, NOW);
         PlanPrice price = plan.addPrice(new BigDecimal("49.90"), "BRL", BillingInterval.MONTHLY, NOW);
-        return SubscriberSummary.of(Subscriber.start("Grace", "grace@navy.mil", price, NOW), plan);
+        return SubscriberSummary.of(Subscriber.start("Grace", "grace@navy.mil", "52998224725", price, NOW), plan);
     }
 
     private static MockHttpServletRequestBuilder json(MockHttpServletRequestBuilder request, String body) {

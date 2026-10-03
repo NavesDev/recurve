@@ -74,7 +74,7 @@ class SubscriberServiceIT {
             doThrow(new DataAccessResourceFailureException("search node down"))
                     .when(searchRepository).save(any(SubscriberSummary.class));
 
-            assertThatThrownBy(() -> service.create(new CreateSubscriberCommand("Grace", "grace@navy.mil", price.getId())))
+            assertThatThrownBy(() -> service.create(new CreateSubscriberCommand("Grace", "grace@navy.mil", "52998224725", price.getId())))
                     .isInstanceOf(DataAccessResourceFailureException.class);
 
             assertThat(repository.count()).isZero();
@@ -88,7 +88,7 @@ class SubscriberServiceIT {
         @Test
         void aRegisteredSubscriberIsCanceledWithItsPriceIntact() {
             SubscriberSummary created = service.create(
-                    new CreateSubscriberCommand("Grace", "grace@navy.mil", price.getId()));
+                    new CreateSubscriberCommand("Grace", "grace@navy.mil", "52998224725", price.getId()));
 
             SubscriberSummary canceled = service.cancel(created.id());
 

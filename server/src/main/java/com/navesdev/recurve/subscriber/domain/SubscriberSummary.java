@@ -40,6 +40,8 @@ public record SubscriberSummary(
         @Id UUID id,
         String name,
         String email,
+        // Not "document": Spring Data Elasticsearch takes a property of that name for the id.
+        String taxDocument,
         SubscriberStatus status,
         UUID planId,
         UUID planPriceId,
@@ -58,6 +60,7 @@ public record SubscriberSummary(
                 subscriber.getId(),
                 subscriber.getName(),
                 subscriber.getEmail(),
+                subscriber.getDocument(),
                 subscriber.getStatus(),
                 plan.getId(),
                 price.getId(),

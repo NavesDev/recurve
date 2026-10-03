@@ -44,6 +44,44 @@ class SubscriberValidatorTest {
     }
 
     @Nested
+    @DisplayName("The tax document the gateway requires is a CPF or a CNPJ")
+    class Document {
+
+        @Test
+        void aCpfIsStoredAsItsDigits() {
+            assertThat(SubscriberValidator.document("529.982.247-25")).isEqualTo("52998224725");
+            assertThat(SubscriberValidator.document(" 52998224725 ")).isEqualTo("52998224725");
+        }
+
+        @Test
+        void aCnpjIsStoredAsItsDigits() {
+            assertThat(SubscriberValidator.document("11.222.333/0001-81")).isEqualTo("11222333000181");
+        }
+
+        @ParameterizedTest
+        @ValueSource(strings = { "529.982.247-24", "11.222.333/0001-80", "111.111.111-11", "00000000000000" })
+        void aDocumentWhoseCheckDigitsDoNotAddUpIsRefused(String document) {
+            assertThatThrownBy(() -> SubscriberValidator.document(document))
+                    .isInstanceOf(InvalidSubscriberException.class).hasMessageContaining("document");
+        }
+
+        @ParameterizedTest
+        @ValueSource(strings = { "5299822472", "529982247250", "abc.def.ghi-jk", "529.982.247-2X" })
+        void aDocumentOfAnotherLengthOrWithLettersIsRefused(String document) {
+            assertThatThrownBy(() -> SubscriberValidator.document(document))
+                    .isInstanceOf(InvalidSubscriberException.class).hasMessageContaining("document");
+        }
+
+        @Test
+        void aDocumentIsRequired() {
+            assertThatThrownBy(() -> SubscriberValidator.document(" "))
+                    .isInstanceOf(InvalidSubscriberException.class).hasMessageContaining("document");
+            assertThatThrownBy(() -> SubscriberValidator.document(null))
+                    .isInstanceOf(InvalidSubscriberException.class).hasMessageContaining("document");
+        }
+    }
+
+    @Nested
     @DisplayName("BR-02 an email has one canonical form")
     class Email {
 

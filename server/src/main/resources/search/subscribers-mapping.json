@@ -17,6 +17,7 @@
         "keyword": { "type": "keyword", "normalizer": "lowercase" }
       }
     },
+    "taxDocument": { "type": "keyword", "index": false, "doc_values": false },
     "status": { "type": "keyword", "index": false },
     "planId": { "type": "keyword", "index": false },
     "planPriceId": { "type": "keyword", "index": false },

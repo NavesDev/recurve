@@ -56,9 +56,9 @@ class SubscriberSearchRepositoryIT {
         Plan basic = Plan.create("Basic", null, JAN);
         PlanPrice basicMonthly = basic.addPrice(new BigDecimal("9.90"), "BRL", BillingInterval.MONTHLY, JAN);
 
-        Subscriber grace = Subscriber.start("Grace Hopper", "grace@navy.mil", proMonthly, JAN);
-        Subscriber ada = Subscriber.start("Ada Lovelace", "ada@engine.org", proYearly, FEB);
-        Subscriber alan = Subscriber.start("Alan Turing", "alan@bletchley.uk", basicMonthly, MAR);
+        Subscriber grace = Subscriber.start("Grace Hopper", "grace@navy.mil", "52998224725", proMonthly, JAN);
+        Subscriber ada = Subscriber.start("Ada Lovelace", "ada@engine.org", "52998224725", proYearly, FEB);
+        Subscriber alan = Subscriber.start("Alan Turing", "alan@bletchley.uk", "52998224725", basicMonthly, MAR);
         alan.cancel(MAR);
 
         repository.save(SubscriberSummary.of(grace, pro));

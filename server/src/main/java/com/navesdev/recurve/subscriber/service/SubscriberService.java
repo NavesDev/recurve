@@ -57,7 +57,7 @@ public class SubscriberService {
         }
         Plan plan = planService.findForSubscription(command.planPriceId());
         Subscriber subscriber = Subscriber.start(
-                command.name(), email, plan.price(command.planPriceId()), clock.instant());
+                command.name(), email, command.document(), plan.price(command.planPriceId()), clock.instant());
         return persist(subscriber, plan);
     }
 
@@ -67,7 +67,7 @@ public class SubscriberService {
         if (!subscriber.getEmail().equals(email) && repository.existsByEmailAndIdNot(email, subscriber.getId())) {
             throw new SubscriberEmailAlreadyInUseException(email);
         }
-        subscriber.update(command.name(), email);
+        subscriber.update(command.name(), email, command.document());
         return persist(subscriber, planOf(subscriber));
     }
 

@@ -62,12 +62,13 @@ class SubscriberRepositoryIT {
 
         @Test
         void everyAttributeComesBack() {
-            Subscriber subscriber = store(Subscriber.start("Grace", "grace@navy.mil", price, NOW));
+            Subscriber subscriber = store(Subscriber.start("Grace", "grace@navy.mil", "52998224725", price, NOW));
 
             Subscriber found = repository.findById(subscriber.getId()).orElseThrow();
 
             assertThat(found.getPlanPriceId()).isEqualTo(price.getId());
             assertThat(found.getEmail()).isEqualTo("grace@navy.mil");
+            assertThat(found.getDocument()).isEqualTo("52998224725");
             assertThat(found.getStatus()).isEqualTo(SubscriberStatus.ACTIVE);
             assertThat(found.getStartedAt()).isEqualTo(NOW);
             assertThat(found.getNextBillingAt()).isEqualTo(Instant.parse("2026-02-15T10:00:00Z"));
@@ -75,8 +76,28 @@ class SubscriberRepositoryIT {
         }
 
         @Test
+        void theGatewayCustomerIsStored() {
+            Subscriber subscriber = store(Subscriber.start("Grace", "grace@navy.mil", "52998224725", price, NOW));
+
+            Subscriber loaded = repository.findById(subscriber.getId()).orElseThrow();
+            loaded.attachGatewayCustomer("cus_000005219613");
+            store(loaded);
+
+            assertThat(repository.findById(subscriber.getId()).orElseThrow().getGatewayCustomerId())
+                    .isEqualTo("cus_000005219613");
+        }
+
+        @Test
+        void aSubscriberFromBeforeTheDocumentLoadsAndIsNotBillable() {
+            Subscriber subscriber = store(Subscriber.start("Grace", "grace@navy.mil", "52998224725", price, NOW));
+            entityManager.createNativeQuery("UPDATE subscribers SET document = NULL").executeUpdate();
+
+            assertThat(repository.findById(subscriber.getId()).orElseThrow().isBillable()).isFalse();
+        }
+
+        @Test
         void aCancellationIsStored() {
-            Subscriber subscriber = store(Subscriber.start("Grace", "grace@navy.mil", price, NOW));
+            Subscriber subscriber = store(Subscriber.start("Grace", "grace@navy.mil", "52998224725", price, NOW));
 
             Subscriber loaded = repository.findById(subscriber.getId()).orElseThrow();
             loaded.cancel(LATER);
@@ -94,7 +115,7 @@ class SubscriberRepositoryIT {
 
         @Test
         void anEmailInUseIsFound() {
-            store(Subscriber.start("Grace", "grace@navy.mil", price, NOW));
+            store(Subscriber.start("Grace", "grace@navy.mil", "52998224725", price, NOW));
 
             assertThat(repository.existsByEmail("grace@navy.mil")).isTrue();
             assertThat(repository.existsByEmail("ada@navy.mil")).isFalse();
@@ -102,8 +123,8 @@ class SubscriberRepositoryIT {
 
         @Test
         void aSubscriberDoesNotCollideWithItself() {
-            Subscriber grace = store(Subscriber.start("Grace", "grace@navy.mil", price, NOW));
-            Subscriber ada = store(Subscriber.start("Ada", "ada@navy.mil", price, NOW));
+            Subscriber grace = store(Subscriber.start("Grace", "grace@navy.mil", "52998224725", price, NOW));
+            Subscriber ada = store(Subscriber.start("Ada", "ada@navy.mil", "52998224725", price, NOW));
 
             assertThat(repository.existsByEmailAndIdNot("grace@navy.mil", grace.getId())).isFalse();
             assertThat(repository.existsByEmailAndIdNot("grace@navy.mil", ada.getId())).isTrue();
@@ -111,7 +132,7 @@ class SubscriberRepositoryIT {
 
         @Test
         void aCanceledSubscriberKeepsTheEmail() {
-            Subscriber grace = Subscriber.start("Grace", "grace@navy.mil", price, NOW);
+            Subscriber grace = Subscriber.start("Grace", "grace@navy.mil", "52998224725", price, NOW);
             grace.cancel(LATER);
             store(grace);
 
@@ -122,9 +143,9 @@ class SubscriberRepositoryIT {
         void twoSubscribersWithOneEmailCannotBeStored() {
             // The service checks first; the constraint stands behind it for
             // two requests that race past that check.
-            store(Subscriber.start("Grace", "grace@navy.mil", price, NOW));
+            store(Subscriber.start("Grace", "grace@navy.mil", "52998224725", price, NOW));
 
-            assertThatThrownBy(() -> store(Subscriber.start("Grace", "grace@navy.mil", price, NOW)))
+            assertThatThrownBy(() -> store(Subscriber.start("Grace", "grace@navy.mil", "52998224725", price, NOW)))
                     .isInstanceOf(PersistenceException.class);
         }
     }
@@ -168,8 +189,8 @@ class SubscriberRepositoryIT {
 
         @Test
         void everySubscriberIsStreamed() {
-            store(Subscriber.start("Grace", "grace@navy.mil", price, NOW));
-            store(Subscriber.start("Ada", "ada@navy.mil", price, NOW));
+            store(Subscriber.start("Grace", "grace@navy.mil", "52998224725", price, NOW));
+            store(Subscriber.start("Ada", "ada@navy.mil", "52998224725", price, NOW));
 
             try (Stream<Subscriber> subscribers = repository.streamAll()) {
                 assertThat(subscribers).extracting(Subscriber::getName).containsExactlyInAnyOrder("Grace", "Ada");

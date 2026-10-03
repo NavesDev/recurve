@@ -107,7 +107,7 @@ class SubscriberContractIT {
         PlanPrice price = plan.addPrice(new BigDecimal("49.90"), "BRL", BillingInterval.MONTHLY, NOW);
         planRepository.save(plan);
         priceId = price.getId();
-        Subscriber grace = subscriberRepository.save(Subscriber.start("Grace Hopper", "grace@navy.mil", price, NOW));
+        Subscriber grace = subscriberRepository.save(Subscriber.start("Grace Hopper", "grace@navy.mil", "52998224725", price, NOW));
         subscriberId = subscriberSearchRepository.save(SubscriberSummary.of(grace, plan)).id();
         entityManager.flush();
     }
@@ -115,7 +115,7 @@ class SubscriberContractIT {
     @Test
     void registersASubscriber() throws Exception {
         mvc.perform(post("/api/subscribers").with(manager()).contentType(MediaType.APPLICATION_JSON)
-                .content("{\"name\":\"Ada\",\"email\":\"ada@engine.org\",\"planPriceId\":\"%s\"}".formatted(priceId)))
+                .content("{\"name\":\"Ada\",\"email\":\"ada@engine.org\",\"document\":\"52998224725\",\"planPriceId\":\"%s\"}".formatted(priceId)))
                 .andExpect(status().isCreated())
                 .andExpect(CONTRACT);
     }
@@ -131,7 +131,7 @@ class SubscriberContractIT {
     @Test
     void refusesAnEmailInUse() throws Exception {
         mvc.perform(post("/api/subscribers").with(manager()).contentType(MediaType.APPLICATION_JSON)
-                .content("{\"name\":\"Grace\",\"email\":\"grace@navy.mil\",\"planPriceId\":\"%s\"}".formatted(priceId)))
+                .content("{\"name\":\"Grace\",\"email\":\"grace@navy.mil\",\"document\":\"52998224725\",\"planPriceId\":\"%s\"}".formatted(priceId)))
                 .andExpect(status().isUnprocessableEntity())
                 .andExpect(CONTRACT);
     }
@@ -139,7 +139,7 @@ class SubscriberContractIT {
     @Test
     void reportsAMissingPrice() throws Exception {
         mvc.perform(post("/api/subscribers").with(manager()).contentType(MediaType.APPLICATION_JSON)
-                .content("{\"name\":\"Ada\",\"email\":\"ada@engine.org\",\"planPriceId\":\"%s\"}"
+                .content("{\"name\":\"Ada\",\"email\":\"ada@engine.org\",\"document\":\"52998224725\",\"planPriceId\":\"%s\"}"
                         .formatted(UUID.randomUUID())))
                 .andExpect(status().isNotFound())
                 .andExpect(CONTRACT);
@@ -162,7 +162,7 @@ class SubscriberContractIT {
     @Test
     void updatesASubscriber() throws Exception {
         mvc.perform(put("/api/subscribers/{id}", subscriberId).with(manager()).contentType(MediaType.APPLICATION_JSON)
-                .content("{\"name\":\"Grace B. Hopper\",\"email\":\"gbh@navy.mil\"}"))
+                .content("{\"name\":\"Grace B. Hopper\",\"email\":\"gbh@navy.mil\",\"document\":\"52998224725\"}"))
                 .andExpect(status().isOk())
                 .andExpect(CONTRACT);
     }

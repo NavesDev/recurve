@@ -61,8 +61,8 @@ class SubscriberIndexBootstrapIT {
         plan = Plan.create("Pro", null, NOW);
         price = plan.addPrice(new BigDecimal("49.90"), "BRL", BillingInterval.MONTHLY, NOW);
         entityManager.persist(plan);
-        repository.save(Subscriber.start("Grace Hopper", "grace@navy.mil", price, NOW));
-        repository.save(Subscriber.start("Ada Lovelace", "ada@engine.org", price, NOW));
+        repository.save(Subscriber.start("Grace Hopper", "grace@navy.mil", "52998224725", price, NOW));
+        repository.save(Subscriber.start("Ada Lovelace", "ada@engine.org", "52998224725", price, NOW));
         entityManager.flush();
     }
 
@@ -98,7 +98,7 @@ class SubscriberIndexBootstrapIT {
         @Test
         void startupDoesNotRebuildAnIndexThatIsAlreadyThere() {
             searchRepository.recreateIndex();
-            searchRepository.save(SubscriberSummary.of(Subscriber.start("Only", "only@navy.mil", price, NOW), plan));
+            searchRepository.save(SubscriberSummary.of(Subscriber.start("Only", "only@navy.mil", "52998224725", price, NOW), plan));
 
             bootstrap.run(null);
 

@@ -1,5 +1,5 @@
-.group { display: flex; flex-direction: column; gap: 7px; border: none; padding: 0; margin: 0; }
-.legend { font-size: var(--rc-size-support); font-weight: 600; padding: 0; margin-bottom: 7px; }
+.group { display: flex; flex-direction: column; gap: 7px; }
+.legend { font-size: var(--rc-size-support); font-weight: 600; }
 .track { display: inline-flex; gap: 4px; padding: 3px; background: var(--rc-fill); border-radius: 10px; align-self: flex-start; }
 .option { position: relative; }
 .option input { position: absolute; opacity: 0; inset: 0; margin: 0; cursor: pointer; }
@@ -8,3 +8,6 @@
 }
 .option input:checked + span { background: var(--rc-surface); color: var(--rc-ink); box-shadow: 0 1px 2px rgba(0, 0, 0, 0.1); }
 .option input:focus-visible + span { box-shadow: 0 0 0 3px var(--rc-action-ring); }
+.inline { flex-direction: row; align-items: center; justify-content: space-between; gap: var(--rc-space-4);
+  padding: 6px 0; border-top: 1px solid var(--rc-separator); }
+.inline .legend { font-weight: 500; font-size: var(--rc-size-body); }

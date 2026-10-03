@@ -53,3 +53,18 @@ export const payments = {
     createdAt: '2026-09-01T12:00:00Z',
   },
 };
+
+export const users = {
+  joana: {
+    id: 'me', name: 'Joana Martins', email: 'joana@recurve.app', active: true, createdAt: '2026-01-01T12:00:00Z',
+    permissions: ['MANAGE_USERS', 'MANAGE_PLANS', 'MANAGE_SUBSCRIBERS', 'MANAGE_PAYMENTS', 'MANAGE_SYSTEM'],
+  },
+  diego: {
+    id: 'user-diego', name: 'Diego Póvoa', email: 'diego@recurve.app', active: true, createdAt: '2026-02-01T12:00:00Z',
+    permissions: ['MANAGE_PLANS', 'VIEW_SUBSCRIBERS', 'MANAGE_PAYMENTS'],
+  },
+  caio: {
+    id: 'user-caio', name: 'Caio Bastos', email: 'caio@recurve.app', active: false, createdAt: '2025-07-01T12:00:00Z',
+    permissions: [],
+  },
+};

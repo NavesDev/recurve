@@ -1,0 +1,4 @@
+.grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); gap: 14px; }
+.count { font-family: var(--rc-mono); font-size: 14px; color: var(--rc-ink); }
+.hint { margin: 0; color: var(--rc-ink-2); font-size: var(--rc-size-support); }
+.error { color: var(--rc-danger-ink); font-size: var(--rc-size-support); margin: 0; }

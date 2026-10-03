@@ -9,8 +9,8 @@ import { ROUTES } from './shared/constants/routes';
 import { ToastProvider } from './shared/design/Toast';
 import { Shell } from './Shell';
 import { subscriberNav, subscriberRoutes } from './subscriber';
-import { systemNav } from './system';
-import { userNav } from './user';
+import { systemNav, systemRoutes } from './system';
+import { userNav, userRoutes } from './user';
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -45,6 +45,8 @@ const routes: RouteObject[] = [
       ...planRoutes,
       ...subscriberRoutes,
       ...paymentRoutes,
+      ...userRoutes,
+      ...systemRoutes,
       { path: '*', element: <NotFound /> },
     ],
   },

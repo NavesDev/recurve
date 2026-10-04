@@ -116,6 +116,25 @@ describe('Menu', () => {
     expect(screen.queryByRole('menu')).not.toBeInTheDocument();
   });
 
+  it('floats outside its container, so a scrolling table cannot clip it or grow', async () => {
+    const { container } = render(<Menu label="Ações" items={[{ label: 'Editar', onSelect: vi.fn() }]} />);
+
+    await userEvent.click(screen.getByRole('button', { name: 'Ações' }));
+    const menu = screen.getByRole('menu');
+    expect(container).not.toContainElement(menu);
+    expect(menu).toHaveStyle({ position: 'fixed' });
+  });
+
+  it('closes on a click outside, but not on a click inside', async () => {
+    render(<><Menu label="Ações" items={[{ label: 'Editar', onSelect: vi.fn() }]} /><p>fora</p></>);
+
+    await userEvent.click(screen.getByRole('button', { name: 'Ações' }));
+    await userEvent.click(screen.getByRole('menu'));
+    expect(screen.getByRole('menu')).toBeInTheDocument();
+    await userEvent.click(screen.getByText('fora'));
+    expect(screen.queryByRole('menu')).not.toBeInTheDocument();
+  });
+
   it('renders nothing without an action (fail-closed: no empty menu)', () => {
     const { container } = render(<Menu label="Ações" items={[]} />);
     expect(container).toBeEmptyDOMElement();

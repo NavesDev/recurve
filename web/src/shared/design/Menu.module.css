@@ -5,7 +5,7 @@
 }
 .trigger:hover { background: var(--rc-fill); }
 .menu {
-  position: absolute; top: calc(100% + 6px); right: 0; z-index: 60; min-width: 210px;
+  z-index: 60; min-width: 210px;
   background: var(--rc-surface); border: 1px solid var(--rc-separator); border-radius: 10px;
   box-shadow: 0 10px 30px rgba(0, 0, 0, 0.14); padding: 5px; display: flex; flex-direction: column;
   animation: rc-rise 120ms ease both;
